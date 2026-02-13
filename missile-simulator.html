@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global ICBM Simulator</title>
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --text-color: #00ff00;
+            --accent-color: #00cc00;
+            --danger-color: #ff0000;
+            --font-main: 'Courier New', Courier, monospace;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-main);
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #app {
+            width: 90vw;
+            height: 90vh;
+            border: 2px solid var(--accent-color);
+            padding: 20px;
+            box-sizing: border-box;
+            position: relative;
+            background: linear-gradient(180deg, #111 0%, #050505 100%);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+        }
+
+        .screen {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        h1, h2 {
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-bottom: 20px;
+        }
+
+        .crt-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 118, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        button {
+            background: transparent;
+            color: var(--text-color);
+            border: 1px solid var(--text-color);
+            padding: 10px 20px;
+            cursor: pointer;
+            font-family: var(--font-main);
+            text-transform: uppercase;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: var(--text-color);
+            color: var(--bg-color);
+        }
+
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        /* Control Panel Styles */
+        .panel-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            height: 100%;
+        }
+
+        .status-display {
+            border: 1px solid var(--accent-color);
+            padding: 15px;
+            background: rgba(0, 50, 0, 0.3);
+            font-size: 0.9em;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .keypad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 200px;
+            margin: 0 auto;
+        }
+
+        .keypad button {
+            padding: 15px;
+            font-weight: bold;
+        }
+
+        .switch-group {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            border: 1px dashed var(--accent-color);
+            padding: 20px;
+        }
+
+        .indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #333;
+            box-shadow: inset 0 0 5px #000;
+        }
+
+        .indicator.on {
+            background: #0f0;
+            box-shadow: 0 0 10px #0f0;
+        }
+
+        .indicator.error {
+            background: #f00;
+            box-shadow: 0 0 10px #f00;
+        }
+
+        .big-red-button {
+            width: 100px;
+            height: 100px;
+            background: radial-gradient(#f00, #900);
+            border-radius: 50%;
+            border: 5px solid #500;
+            cursor: pointer;
+            margin: 0 auto;
+            box-shadow: 0 10px 0 #300;
+            transition: all 0.1s;
+        }
+
+        .big-red-button:active {
+            transform: translateY(5px);
+            box-shadow: 0 5px 0 #300;
+        }
+
+        .dual-keys {
+            display: flex;
+            gap: 50px;
+            justify-content: center;
+        }
+
+        .key-slot {
+            width: 60px;
+            height: 60px;
+            border: 2px solid #666;
+            background: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .key-slot.turned {
+            transform: rotate(90deg);
+            border-color: var(--text-color);
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="crt-overlay"></div>
+        <div id="main-menu" class="screen active">
+            <h1>Global ICBM Simulator</h1>
+            <p style="text-align: center;">SELECT NATION OF ORIGIN</p>
+            <div id="country-list" class="menu-grid">
+                <!-- Countries will be injected here -->
+            </div>
+        </div>
+
+        <div id="missile-menu" class="screen">
+            <h1 id="selected-country-name">COUNTRY</h1>
+            <p style="text-align: center;">SELECT WEAPON SYSTEM</p>
+            <div id="missile-list" class="menu-grid">
+                <!-- Missiles will be injected here -->
+            </div>
+            <button onclick="resetToMenu()" style="margin-top: 20px;">BACK TO MAIN MENU</button>
+        </div>
+
+        <div id="simulator" class="screen">
+            <div id="control-panel">
+                <!-- Specific controls will be injected here -->
+            </div>
+        </div>
+
+        <div id="launch-screen" class="screen">
+            <h1 id="launch-status">MISSILE AWAY</h1>
+            <div id="animation-container" style="flex: 1; position: relative; overflow: hidden; background: #000;">
+                <svg id="missile-svg" viewBox="0 0 100 100" style="width: 100%; height: 100%;">
+                    <!-- Animation elements will be here -->
+                </svg>
+            </div>
+            <div id="impact-info" style="text-align: center; padding: 20px; font-size: 1.2em;"></div>
+            <button onclick="resetToMenu()">RESET SIMULATOR</button>
+        </div>
+    </div>
+
+    <script>
+        // Audio Synthesis
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            switch(type) {
+                case 'beep':
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(880, now);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                    break;
+                case 'click':
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(150, now);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                    break;
+                case 'alarm':
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.linearRampToValueAtTime(880, now + 0.5);
+                    osc.frequency.linearRampToValueAtTime(440, now + 1.0);
+                    gain.gain.setValueAtTime(0.05, now);
+                    gain.gain.linearRampToValueAtTime(0.05, now + 1.0);
+                    gain.gain.linearRampToValueAtTime(0, now + 1.1);
+                    osc.start(now);
+                    osc.stop(now + 1.1);
+                    break;
+                case 'launch':
+                    // White noise simulation for launch
+                    const bufferSize = audioCtx.sampleRate * 2;
+                    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                    const output = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        output[i] = Math.random() * 2 - 1;
+                    }
+                    const whiteNoise = audioCtx.createBufferSource();
+                    whiteNoise.buffer = buffer;
+                    const lowpass = audioCtx.createBiquadFilter();
+                    lowpass.type = 'lowpass';
+                    lowpass.frequency.setValueAtTime(400, now);
+                    lowpass.frequency.exponentialRampToValueAtTime(100, now + 2);
+                    whiteNoise.connect(lowpass);
+                    const nGain = audioCtx.createGain();
+                    nGain.gain.setValueAtTime(0.3, now);
+                    nGain.gain.exponentialRampToValueAtTime(0.01, now + 2);
+                    lowpass.connect(nGain);
+                    nGain.connect(audioCtx.destination);
+                    whiteNoise.start(now);
+                    break;
+            }
+        }
+
+        const nations = {
+            usa: {
+                name: "United States of America",
+                color: "#4a90e2",
+                controlType: "LCC_US",
+                missiles: [
+                    { id: "minuteman", name: "LGM-30G Minuteman III", type: "Silo-based ICBM" },
+                    { id: "trident", name: "UGM-133 Trident II (D5)", type: "SLBM" }
+                ]
+            },
+            russia: {
+                name: "Russian Federation",
+                color: "#e30022",
+                controlType: "SOVIET_RU",
+                missiles: [
+                    { id: "yars", name: "RS-24 Yars", type: "Mobile/Silo ICBM" },
+                    { id: "sarmat", name: "RS-28 Sarmat", type: "Heavy ICBM" }
+                ]
+            },
+            china: {
+                name: "China",
+                color: "#ffde00",
+                controlType: "MODERN_CN",
+                missiles: [
+                    { id: "df41", name: "DF-41", type: "Road-mobile ICBM" },
+                    { id: "df31", name: "DF-31AG", type: "Mobile ICBM" }
+                ]
+            },
+            north_korea: {
+                name: "DPRK (North Korea)",
+                color: "#ed1c24",
+                controlType: "RUGGED_NK",
+                missiles: [
+                    { id: "hwasong17", name: "Hwasong-17", type: "Mobile Heavy ICBM" },
+                    { id: "hwasong18", name: "Hwasong-18", type: "Solid-fuel ICBM" }
+                ]
+            },
+            uk: {
+                name: "United Kingdom",
+                color: "#00247d",
+                controlType: "RN_UK",
+                missiles: [
+                    { id: "trident_uk", name: "Trident II (D5)", type: "SLBM (Vanguard-class)" }
+                ]
+            },
+            france: {
+                name: "France",
+                color: "#00209f",
+                controlType: "EU_FR",
+                missiles: [
+                    { id: "m51", name: "M51", type: "SLBM (Triomphant-class)" }
+                ]
+            },
+            india: {
+                name: "India",
+                color: "#ff9933",
+                controlType: "ISRO_IN",
+                missiles: [
+                    { id: "agni5", name: "Agni-V", type: "Road-mobile ICBM" }
+                ]
+            },
+            pakistan: {
+                name: "Pakistan",
+                color: "#006600",
+                controlType: "PA_PK",
+                missiles: [
+                    { id: "shaheen3", name: "Shaheen-III", type: "MRBM" }
+                ]
+            },
+            israel: {
+                name: "Israel",
+                color: "#0038b8",
+                controlType: "IDF_IL",
+                missiles: [
+                    { id: "jericho3", name: "Jericho III", type: "ICBM" }
+                ]
+            }
+        };
+
+        let currentTimer = null;
+        let currentState = {
+            nation: null,
+            missile: null,
+            step: 'idle',
+            pal: '',
+            keys: { 1: false, 2: false },
+            isArmed: false,
+            isBioScanning: false,
+            bioProgress: 0,
+            targetSet: false
+        };
+
+        function resetSequence() {
+            if (currentTimer) clearInterval(currentTimer);
+            currentState.pal = '';
+            currentState.keys = { 1: false, 2: false };
+            currentState.isArmed = false;
+            currentState.isBioScanning = false;
+            currentState.bioProgress = 0;
+            currentState.targetSet = false;
+        }
+
+        function updateLog(msg) {
+            const log = document.getElementById('log');
+            if (log) {
+                log.innerHTML += `[${new Date().toLocaleTimeString()}] ${msg}<br>`;
+                log.scrollTop = log.scrollHeight;
+            }
+        }
+
+        // USA Logic
+        function inputPAL(n) {
+            playSound('beep');
+            if (currentState.pal.length < 6) {
+                currentState.pal += n;
+                document.getElementById('pal-display').innerText = currentState.pal.padEnd(6, '-');
+            }
+        }
+
+        function clearPAL() {
+            currentState.pal = '';
+            document.getElementById('pal-display').innerText = '------';
+        }
+
+        function verifyPAL() {
+            if (currentState.pal.length === 6) {
+                updateLog("PAL AUTHENTICATED. KEYS ENABLED.");
+                document.getElementById('pal-display').style.color = '#0f0';
+            } else {
+                updateLog("INVALID PAL LENGTH.");
+            }
+        }
+
+        function turnKey(n) {
+            playSound('click');
+            if (currentState.pal.length !== 6) {
+                updateLog("PAL AUTHORIZATION REQUIRED FIRST.");
+                return;
+            }
+            currentState.keys[n] = !currentState.keys[n];
+            document.getElementById(`key-${n}`).classList.toggle('turned');
+            if (currentState.keys[1] && currentState.keys[2]) {
+                updateLog("DUAL KEYS TURNED. SYSTEM ARMED.");
+                document.getElementById('launch-btn').disabled = false;
+            } else {
+                document.getElementById('launch-btn').disabled = true;
+            }
+        }
+
+        // Russia Logic
+        function verifyRUCode() {
+            playSound('beep');
+            const code = document.getElementById('ru-code').value;
+            if (code) {
+                updateLog("КОД ПОДТВЕРЖДЕН. СИСТЕМА ГОТОВА.");
+                updateLog("CODE VERIFIED. SYSTEM READY.");
+            }
+        }
+
+        function toggleArm() {
+            playSound('click');
+            currentState.isArmed = !currentState.isArmed;
+            document.getElementById('arm-ind').classList.toggle('on');
+            updateLog(currentState.isArmed ? "SYSTEM ARMED." : "SYSTEM DISARMED.");
+        }
+
+        // China Logic
+        let bioInterval;
+        function startBiometric() {
+            currentState.isBioScanning = true;
+            bioInterval = setInterval(() => {
+                if (currentState.bioProgress < 100) {
+                    currentState.bioProgress += 5;
+                    document.getElementById('bio-bar').style.width = currentState.bioProgress + '%';
+                } else {
+                    clearInterval(bioInterval);
+                    updateLog("BIOMETRICS VERIFIED.");
+                    checkChinaReady();
+                }
+            }, 100);
+        }
+
+        function stopBiometric() {
+            currentState.isBioScanning = false;
+            clearInterval(bioInterval);
+            if (currentState.bioProgress < 100) {
+                currentState.bioProgress = 0;
+                document.getElementById('bio-bar').style.width = '0%';
+            }
+        }
+
+        function setTarget(t) {
+            currentState.targetSet = true;
+            updateLog(`TARGET SET TO ${t}.`);
+            checkChinaReady();
+        }
+
+        function checkChinaReady() {
+            if (currentState.bioProgress >= 100 && currentState.targetSet) {
+                document.getElementById('launch-btn-cn').disabled = false;
+            }
+        }
+
+        // NK Logic
+        function verifyNK() {
+            playSound('beep');
+            updateLog("SUPREME LEADER AUTHORIZATION RECEIVED.");
+            updateLog("GLORY TO THE DPRK.");
+        }
+
+        function initiateLaunch() {
+            playSound('alarm');
+            updateLog("LAUNCH INITIATED!");
+            let countdown = 5;
+            currentTimer = setInterval(() => {
+                if (countdown > 0) {
+                    playSound('beep');
+                    updateLog(`T-MINUS ${countdown}...`);
+                    countdown--;
+                } else {
+                    clearInterval(currentTimer);
+                    executeLaunch();
+                }
+            }, 1000);
+        }
+
+        function executeLaunch() {
+            playSound('launch');
+            showScreen('launch-screen');
+            startLaunchAnimation();
+        }
+
+        function startLaunchAnimation() {
+            const svg = document.getElementById('missile-svg');
+            svg.innerHTML = `
+                <text x="10" y="10" fill="red" font-size="5">${currentState.missile.name.toUpperCase()} IN FLIGHT</text>
+                <rect x="49" y="80" width="2" height="10" fill="white">
+                    <animate attributeName="y" from="100" to="-20" dur="5s" fill="freeze" />
+                </rect>
+                <path d="M45,100 Q50,90 55,100" fill="orange">
+                     <animate attributeName="d" values="M45,100 Q50,90 55,100; M45,100 Q50,70 55,100; M45,100 Q50,90 55,100" dur="0.1s" repeatCount="indefinite" />
+                     <animate attributeName="transform" attributeType="XML" type="translate" from="0,0" to="0,-120" dur="5s" fill="freeze" />
+                </path>
+            `;
+            setTimeout(() => {
+                document.getElementById('impact-info').innerText = "IMPACT CONFIRMED. TARGET NEUTRALIZED.";
+            }, 4000);
+        }
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function resetToMenu() {
+            resetSequence();
+            showScreen('main-menu');
+        }
+
+        function init() {
+            const countryList = document.getElementById('country-list');
+            for (const key in nations) {
+                const nation = nations[key];
+                const btn = document.createElement('button');
+                btn.innerHTML = `<strong>${nation.name}</strong><br><small>${nation.missiles.length} WEAPON SYSTEMS</small>`;
+                btn.style.borderColor = nation.color;
+                btn.onclick = () => selectNation(key);
+                countryList.appendChild(btn);
+            }
+        }
+
+        function selectNation(key) {
+            currentState.nation = key;
+            const nation = nations[key];
+            document.getElementById('selected-country-name').innerText = nation.name;
+            const missileList = document.getElementById('missile-list');
+            missileList.innerHTML = '';
+
+            nation.missiles.forEach(m => {
+                const btn = document.createElement('button');
+                btn.innerHTML = `<strong>${m.name}</strong><br><small>${m.type}</small>`;
+                btn.onclick = () => selectMissile(m.id);
+                missileList.appendChild(btn);
+            });
+
+            showScreen('missile-menu');
+        }
+
+        function selectMissile(missileId) {
+            const nation = nations[currentState.nation];
+            currentState.missile = nation.missiles.find(m => m.id === missileId);
+            startSimulator();
+        }
+
+        function startSimulator() {
+            showScreen('simulator');
+            renderControlPanel();
+        }
+
+        function renderControlPanel() {
+            const panel = document.getElementById('control-panel');
+            const nation = nations[currentState.nation];
+
+            let controlHTML = `
+                <div class="panel-container">
+                    <div class="status-display" id="status-display">
+                        <h2>${currentState.missile.name}</h2>
+                        <p>NATION: ${nation.name}</p>
+                        <p>STATUS: STANDBY</p>
+                        <hr>
+                        <div id="log" style="height: 200px; overflow-y: auto; font-size: 0.8em; color: #88ff88;">
+                            [SYSTEM] Initializing command link...<br>
+                            [SYSTEM] Secure connection established.<br>
+                        </div>
+                    </div>
+                    <div class="controls" id="controls-area">
+                        ${getControlsForType(nation.controlType)}
+                    </div>
+                </div>
+            `;
+
+            panel.innerHTML = controlHTML;
+            resetSequence();
+        }
+
+        function getControlsForType(type) {
+            switch(type) {
+                case 'LCC_US':
+                    return `
+                        <h3>PAL AUTHORIZATION</h3>
+                        <div id="pal-display" style="text-align:center; font-size: 1.5em; border: 1px solid #333; margin-bottom: 10px;">------</div>
+                        <div class="keypad">
+                            ${[1,2,3,4,5,6,7,8,9].map(n => `<button onclick="inputPAL(${n})">${n}</button>`).join('')}
+                            <button onclick="clearPAL()">CLR</button>
+                            <button onclick="inputPAL(0)">0</button>
+                            <button onclick="verifyPAL()">ENT</button>
+                        </div>
+                        <hr>
+                        <h3>DUAL KEY TURN</h3>
+                        <div class="dual-keys">
+                            <div class="key-slot" id="key-1" onclick="turnKey(1)">🔑</div>
+                            <div class="key-slot" id="key-2" onclick="turnKey(2)">🔑</div>
+                        </div>
+                        <button id="launch-btn" disabled style="margin-top:20px; color: red; border-color: red;" onclick="initiateLaunch()">LAUNCH</button>
+                    `;
+                case 'SOVIET_RU':
+                    return `
+                        <h3>KAVKAZ SYSTEM (КАВКАЗ)</h3>
+                        <p style="font-size: 0.7em;">ENTER COMMAND CODE</p>
+                        <input type="password" id="ru-code" style="background: #000; color: #f00; border: 1px solid #f00; width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 10px;">
+                        <button onclick="verifyRUCode()">ACTIVATE (АКТИВИРОВАТЬ)</button>
+                        <hr>
+                        <div class="switch-group">
+                            <span>MASTER ARM:</span>
+                            <div class="indicator" id="arm-ind"></div>
+                            <button onclick="toggleArm()">TOGGLE</button>
+                        </div>
+                        <div style="text-align: center; margin-top: 20px;">
+                            <div class="big-red-button" id="launch-btn-ru" onclick="initiateLaunch()"></div>
+                            <p>ПУСК</p>
+                        </div>
+                    `;
+                case 'MODERN_CN':
+                    return `
+                        <h3>STRATEGIC SUPPORT FORCE</h3>
+                        <div style="border: 1px solid #ffde00; padding: 10px; background: rgba(255, 222, 0, 0.1);">
+                            <p>BIOMETRIC AUTH REQUIRED</p>
+                            <button onmousedown="startBiometric()" onmouseup="stopBiometric()" style="width: 100%; height: 60px;">[ SCAN THUMBPRINT ]</button>
+                            <div id="bio-progress" style="height: 5px; background: #333; margin-top: 5px;"><div id="bio-bar" style="height: 100%; width: 0%; background: #ffde00;"></div></div>
+                        </div>
+                        <hr>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <button onclick="setTarget('NEW YORK')">TARGET A</button>
+                            <button onclick="setTarget('LOS ANGELES')">TARGET B</button>
+                        </div>
+                        <button id="launch-btn-cn" disabled style="margin-top: 20px; width: 100%; height: 50px; background: #ffde00; color: #000;" onclick="initiateLaunch()">CONFIRM LAUNCH</button>
+                    `;
+                case 'RUGGED_NK':
+                    return `
+                        <h3>SUPREME COMMAND</h3>
+                        <div style="border: 2px solid #555; padding: 15px; background: #1a1a1a; font-family: monospace;">
+                            <p>> CONNECTING TO SATELLITE...</p>
+                            <p>> READY TO FIRE</p>
+                            <button onclick="verifyNK()" style="background: #333; color: #fff; width: 100%;">AUTHORIZE SUPREME LEADER</button>
+                        </div>
+                        <div style="text-align: center; margin-top: 20px;">
+                            <button onclick="initiateLaunch()" style="background: #ed1c24; color: #fff; padding: 20px 40px; font-size: 1.5em; border: 5px double #fff;">LAUNCH</button>
+                        </div>
+                    `;
+                default:
+                    return `
+                        <h3>GENERAL CONTROLS</h3>
+                        <div class="controls">
+                            <button onclick="updateLog('Authorizing...')">AUTHORIZE SYSTEM</button>
+                            <button onclick="updateLog('Targeting locked.')">SET TARGET</button>
+                            <button onclick="initiateLaunch()" style="color: red; border-color: red; padding: 20px;">EXECUTE LAUNCH</button>
+                        </div>
+                    `;
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
