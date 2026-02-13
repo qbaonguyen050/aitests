@@ -105,6 +105,19 @@
             font-size: 0.9em;
         }
 
+        #telemetry-panel {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 200px;
+            background: rgba(0,0,0,0.8);
+            border: 1px solid var(--accent-color);
+            padding: 10px;
+            font-size: 0.7em;
+            display: none;
+            z-index: 10;
+        }
+
         .controls {
             display: flex;
             flex-direction: column;
@@ -219,16 +232,32 @@
 
         <div id="launch-screen" class="screen">
             <h1 id="launch-status">MISSILE AWAY</h1>
+            <div id="telemetry-panel">
+                <p>ALTITUDE: <span id="tel-alt">0</span> km</p>
+                <p>VELOCITY: <span id="tel-vel">0</span> km/s</p>
+                <p>COORD X: <span id="tel-x">0</span></p>
+                <p>COORD Y: <span id="tel-y">0</span></p>
+                <p>ETA: <span id="tel-eta">0</span>s</p>
+            </div>
             <div id="animation-container" style="flex: 1; position: relative; overflow: hidden; background: #000; border: 1px solid #333;">
                 <svg id="missile-svg" viewBox="0 0 200 100" style="width: 100%; height: 100%;">
                     <!-- World Map Background (Simplified) -->
                     <rect width="200" height="100" fill="#000510" />
-                    <!-- Americas -->
-                    <path d="M20,20 L50,20 L60,40 L50,80 L30,90 L10,60 Z" fill="#112233" />
-                    <!-- Eurasia + Africa -->
-                    <path d="M80,20 L160,15 L180,40 L170,80 L140,85 L100,80 L80,50 Z" fill="#112233" />
-                    <!-- Australia -->
-                    <path d="M160,70 L180,70 L185,85 L165,90 Z" fill="#112233" />
+                    <!-- Detailed World Map (Simplified Paths) -->
+                    <g fill="#112233" stroke="#1a334d" stroke-width="0.2">
+                        <!-- North America -->
+                        <path d="M25,15 L45,15 L60,25 L65,40 L55,50 L40,55 L25,50 L15,35 Z" />
+                        <!-- South America -->
+                        <path d="M50,55 L65,60 L60,90 L45,75 L40,65 Z" />
+                        <!-- Eurasia -->
+                        <path d="M80,10 L120,5 L170,10 L185,25 L180,45 L150,55 L130,50 L110,45 L90,35 L85,20 Z" />
+                        <!-- Africa -->
+                        <path d="M85,38 L110,40 L120,55 L115,80 L100,85 L85,75 L80,55 Z" />
+                        <!-- Australia -->
+                        <path d="M160,75 L180,75 L185,85 L175,95 L160,90 Z" />
+                        <!-- Greenland -->
+                        <path d="M55,5 L70,5 L75,15 L60,15 Z" />
+                    </g>
 
                     <g id="map-markers"></g>
                     <g id="map-trajectories"></g>
@@ -312,8 +341,8 @@
                 coords: { x: 40, y: 40 },
                 defense: 0.85,
                 missiles: [
-                    { id: "minuteman", name: "LGM-30G Minuteman III", type: "Silo-based ICBM" },
-                    { id: "trident", name: "UGM-133 Trident II (D5)", type: "SLBM" }
+                    { id: "minuteman", name: "LGM-30G Minuteman III", type: "Silo-based ICBM", speed: 24100 },
+                    { id: "trident", name: "UGM-133 Trident II (D5)", type: "SLBM", speed: 29000 }
                 ]
             },
             russia: {
@@ -323,8 +352,8 @@
                 coords: { x: 120, y: 25 },
                 defense: 0.80,
                 missiles: [
-                    { id: "yars", name: "RS-24 Yars", type: "Mobile/Silo ICBM" },
-                    { id: "sarmat", name: "RS-28 Sarmat", type: "Heavy ICBM" }
+                    { id: "yars", name: "RS-24 Yars", type: "Mobile/Silo ICBM", speed: 24500 },
+                    { id: "sarmat", name: "RS-28 Sarmat", type: "Heavy ICBM", speed: 25500 }
                 ]
             },
             china: {
@@ -334,8 +363,8 @@
                 coords: { x: 150, y: 40 },
                 defense: 0.75,
                 missiles: [
-                    { id: "df41", name: "DF-41", type: "Road-mobile ICBM" },
-                    { id: "df31", name: "DF-31AG", type: "Mobile ICBM" }
+                    { id: "df41", name: "DF-41", type: "Road-mobile ICBM", speed: 30000 },
+                    { id: "df31", name: "DF-31AG", type: "Mobile ICBM", speed: 28000 }
                 ]
             },
             north_korea: {
@@ -345,8 +374,8 @@
                 coords: { x: 165, y: 40 },
                 defense: 0.30,
                 missiles: [
-                    { id: "hwasong17", name: "Hwasong-17", type: "Mobile Heavy ICBM" },
-                    { id: "hwasong18", name: "Hwasong-18", type: "Solid-fuel ICBM" }
+                    { id: "hwasong17", name: "Hwasong-17", type: "Mobile Heavy ICBM", speed: 22000 },
+                    { id: "hwasong18", name: "Hwasong-18", type: "Solid-fuel ICBM", speed: 24000 }
                 ]
             },
             uk: {
@@ -356,7 +385,7 @@
                 coords: { x: 90, y: 30 },
                 defense: 0.70,
                 missiles: [
-                    { id: "trident_uk", name: "Trident II (D5)", type: "SLBM (Vanguard-class)" }
+                    { id: "trident_uk", name: "Trident II (D5)", type: "SLBM (Vanguard-class)", speed: 29000 }
                 ]
             },
             france: {
@@ -366,7 +395,7 @@
                 coords: { x: 92, y: 35 },
                 defense: 0.70,
                 missiles: [
-                    { id: "m51", name: "M51", type: "SLBM (Triomphant-class)" }
+                    { id: "m51", name: "M51", type: "SLBM (Triomphant-class)", speed: 30000 }
                 ]
             },
             india: {
@@ -376,7 +405,7 @@
                 coords: { x: 135, y: 55 },
                 defense: 0.60,
                 missiles: [
-                    { id: "agni5", name: "Agni-V", type: "Road-mobile ICBM" }
+                    { id: "agni5", name: "Agni-V", type: "Road-mobile ICBM", speed: 29400 }
                 ]
             },
             pakistan: {
@@ -386,7 +415,7 @@
                 coords: { x: 130, y: 50 },
                 defense: 0.50,
                 missiles: [
-                    { id: "shaheen3", name: "Shaheen-III", type: "MRBM" }
+                    { id: "shaheen3", name: "Shaheen-III", type: "MRBM", speed: 22000 }
                 ]
             },
             israel: {
@@ -396,7 +425,7 @@
                 coords: { x: 105, y: 45 },
                 defense: 0.90,
                 missiles: [
-                    { id: "jericho3", name: "Jericho III", type: "ICBM" }
+                    { id: "jericho3", name: "Jericho III", type: "ICBM", speed: 25000 }
                 ]
             }
         };
@@ -574,6 +603,8 @@
             const markers = document.getElementById('map-markers');
             const trajectories = document.getElementById('map-trajectories');
             const info = document.getElementById('impact-info');
+            const telPanel = document.getElementById('telemetry-panel');
+            telPanel.style.display = 'block';
 
             markers.innerHTML = '';
             trajectories.innerHTML = '';
@@ -582,94 +613,185 @@
 
             const src = nations[currentState.nation];
             const dst = nations[currentState.targetNation];
+            const missileData = currentState.missile;
 
-            // Draw Source and Target Markers
+            // Draw Markers
             markers.innerHTML += `<circle cx="${src.coords.x}" cy="${src.coords.y}" r="2" fill="${src.color}" />`;
-            markers.innerHTML += `<text x="${src.coords.x}" y="${src.coords.y - 4}" fill="${src.color}" font-size="3" text-anchor="middle">${currentState.nation.toUpperCase()}</text>`;
-
             markers.innerHTML += `<circle cx="${dst.coords.x}" cy="${dst.coords.y}" r="2" fill="${dst.color}" />`;
-            markers.innerHTML += `<text x="${dst.coords.x}" y="${dst.coords.y - 4}" fill="${dst.color}" font-size="3" text-anchor="middle">${currentState.targetNation.toUpperCase()}</text>`;
 
-            // Create Trajectory Arc
+            // Calculate Path
+            const dx = dst.coords.x - src.coords.x;
+            const dy = dst.coords.y - src.coords.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
             const midX = (src.coords.x + dst.coords.x) / 2;
-            const midY = Math.min(src.coords.y, dst.coords.y) - 30; // Apex of flight
+            const midY = Math.min(src.coords.y, dst.coords.y) - (dist * 0.4);
 
-            const pathData = `M${src.coords.x},${src.coords.y} Q${midX},${midY} ${dst.coords.x},${dst.coords.y}`;
-            trajectories.innerHTML += `
-                <path d="${pathData}" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.5" stroke-dasharray="2,2" />
-                <circle id="icbm-dot" r="1.5" fill="#fff">
-                    <animateMotion dur="10s" path="${pathData}" fill="freeze" id="icbm-motion" />
-                </circle>
-            `;
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            const d = `M ${src.coords.x} ${src.coords.y} Q ${midX} ${midY} ${dst.coords.x} ${dst.coords.y}`;
+            path.setAttribute("d", d);
+            path.setAttribute("fill", "none");
+            path.setAttribute("stroke", "rgba(255,255,255,0.2)");
+            path.setAttribute("stroke-width", "0.5");
+            path.setAttribute("stroke-dasharray", "2,2");
+            trajectories.appendChild(path);
 
-            let attempts = 0;
-            const maxAttempts = 3;
-            let intercepted = false;
+            const missileMarker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            missileMarker.setAttribute("r", "1.2");
+            missileMarker.setAttribute("fill", "red");
+            trajectories.appendChild(missileMarker);
 
-            const checkInterception = setInterval(() => {
-                if (intercepted) return;
+            const totalLength = path.getTotalLength();
 
-                attempts++;
-                const progress = attempts / (maxAttempts + 1);
+            // Duration calculation
+            const realDistKm = dist * 100;
+            const speedKmS = (missileData.speed / 3600);
+            const totalFlightSeconds = realDistKm / speedKmS;
+            const uxDurationMs = Math.max(8000, realDistKm / (missileData.speed / 400));
 
-                // Visual Interceptor Launch
-                const interceptorX = dst.coords.x;
-                const interceptorY = dst.coords.y;
+            let defenseLaunchedCount = 0;
+            const maxDefenseAttempts = 3;
+            let isIntercepted = false;
+            const startTime = performance.now();
 
-                info.innerText = `[DEFENSE] ${dst.name} triggering interception attempt ${attempts}/${maxAttempts}...`;
-                playSound('beep');
+            function updateTelemetry(prog, x, y) {
+                const elapsedSec = (performance.now() - startTime) / 1000;
+                const remSec = (uxDurationMs / 1000) - elapsedSec;
+                const maxAlt = realDistKm * 0.25;
+                const curAlt = 4 * maxAlt * prog * (1 - prog);
 
-                const intId = `interceptor-${attempts}`;
-                trajectories.innerHTML += `
-                    <line x1="${interceptorX}" y1="${interceptorY}" x2="${interceptorX}" y2="${interceptorY}" stroke="cyan" stroke-width="0.5">
-                        <animate attributeName="x2" from="${interceptorX}" to="${dst.coords.x - (dst.coords.x - src.coords.x)*(1-progress)}" dur="1s" fill="freeze" />
-                        <animate attributeName="y2" from="${interceptorY}" to="${dst.coords.y - (dst.coords.y - src.coords.y)*(1-progress) - 10}" dur="1s" fill="freeze" />
-                    </line>
-                `;
+                document.getElementById("tel-alt").innerText = Math.round(curAlt);
+                document.getElementById("tel-vel").innerText = (missileData.speed / 3600).toFixed(2);
+                document.getElementById("tel-x").innerText = x.toFixed(2);
+                document.getElementById("tel-y").innerText = y.toFixed(2);
+                document.getElementById("tel-eta").innerText = Math.max(0, Math.round(remSec));
+            }
 
-                // Animate an interceptor missile
-                const dot = document.getElementById('icbm-dot');
-                if (!dot) return;
-                const bBox = dot.getBBox();
-                const currentX = dot.getCTM().e; // Approximate
-                const currentY = dot.getCTM().f;
+            function animate(now) {
+                if (isIntercepted) return;
 
-                // Simulating interception success based on target defense probability
-                if (Math.random() < dst.defense * 0.4) { // Scaled per attempt
-                    intercepted = true;
-                    clearInterval(checkInterception);
+                const elapsed = now - startTime;
+                const progress = Math.min(elapsed / uxDurationMs, 1);
 
-                    // Stop animation
-                    const motion = document.getElementById('icbm-motion');
-                    if (motion) motion.parentNode.removeChild(motion);
+                const point = path.getPointAtLength(progress * totalLength);
+                missileMarker.setAttribute("cx", point.x);
+                missileMarker.setAttribute("cy", point.y);
 
-                    info.innerText = `[ALERT] MISSILE INTERCEPTED BY ${dst.name.toUpperCase()} DEFENSIVE SYSTEMS.`;
-                    info.style.color = '#00ff00';
+                updateTelemetry(progress, point.x, point.y);
+
+                // Visual terminal zone
+                if (progress > 0.8 && !document.getElementById('terminal-zone')) {
+                    info.innerText = "WARNING: MISSILE ENTERING TERMINAL PHASE";
+                    info.style.color = "orange";
+                    const zone = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    zone.setAttribute("id", "terminal-zone");
+                    zone.setAttribute("cx", dst.coords.x);
+                    zone.setAttribute("cy", dst.coords.y);
+                    zone.setAttribute("r", "5");
+                    zone.setAttribute("fill", "none");
+                    zone.setAttribute("stroke", "red");
+                    zone.setAttribute("stroke-width", "0.2");
+                    zone.setAttribute("stroke-dasharray", "1,1");
+                    trajectories.appendChild(zone);
+                }
+
+                // Defense logic: Intercept at stages
+                if (progress > 0.3 && defenseLaunchedCount === 0) {
+                    defenseLaunchedCount = 1;
+                    attemptInterception(dst, point, trajectories, (success) => handleInterception(success, "MID-COURSE (SM-3)"));
+                } else if (progress > 0.6 && defenseLaunchedCount === 1) {
+                    defenseLaunchedCount = 2;
+                    attemptInterception(dst, point, trajectories, (success) => handleInterception(success, "MID-COURSE (GBI)"));
+                } else if (progress > 0.85 && defenseLaunchedCount === 2) {
+                    defenseLaunchedCount = 3;
+                    // Terminal phase: Faster interceptor, higher success, but very late
+                    attemptInterception(dst, point, trajectories, (success) => handleInterception(success, "TERMINAL (THAAD/S-400)"), 400);
+                }
+
+                if (progress < 1 && !isIntercepted) {
+                    requestAnimationFrame(animate);
+                } else if (progress >= 1 && !isIntercepted) {
+                    impact(dst);
+                }
+            }
+
+            function handleInterception(success, phase) {
+                if (success && !isIntercepted) {
+                    isIntercepted = true;
+                    info.innerText = `[ALERT] MISSILE INTERCEPTED BY ${dst.name.toUpperCase()} - ${phase}`;
+                    info.style.color = 'yellow';
                     playSound('alarm');
-
-                    // Show explosion at impact site
-                    trajectories.innerHTML += `<circle cx="${dst.coords.x - (dst.coords.x - src.coords.x)*(1-progress)}" cy="${dst.coords.y - (dst.coords.y - src.coords.y)*(1-progress) - 10}" r="5" fill="orange" opacity="0.8">
+                    // Explosion at current position
+                    const dot = missileMarker;
+                    trajectories.innerHTML += `<circle cx="${dot.getAttribute('cx')}" cy="${dot.getAttribute('cy')}" r="5" fill="orange" opacity="0.8">
                         <animate attributeName="r" from="0" to="10" dur="0.5s" fill="freeze" />
                         <animate attributeName="opacity" from="0.8" to="0" dur="0.5s" fill="freeze" />
                     </circle>`;
+                    setTimeout(() => resetToMenu(), 4000);
+                } else if (!isIntercepted) {
+                    info.innerText = `[DEFENSE] ${dst.name} ${phase} attempt FAILED.`;
+                }
+            }
+
+            function impact(target) {
+                info.innerText = "IMPACT CONFIRMED. TARGET DESTROYED.";
+                info.style.color = '#ff0000';
+                playSound('launch'); // Explosion sound
+                trajectories.innerHTML += `<circle cx="${target.coords.x}" cy="${target.coords.y}" r="10" fill="red" opacity="0.6">
+                    <animate attributeName="r" from="0" to="20" dur="1s" fill="freeze" />
+                    <animate attributeName="opacity" from="0.6" to="0" dur="1s" fill="freeze" />
+                </circle>`;
+                setTimeout(() => resetToMenu(), 4000);
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        function attemptInterception(defender, targetPoint, svg, callback, customDuration = 1000) {
+            const startX = defender.coords.x;
+            const startY = defender.coords.y;
+
+            const interceptor = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            interceptor.setAttribute("x1", startX);
+            interceptor.setAttribute("y1", startY);
+            interceptor.setAttribute("x2", startX);
+            interceptor.setAttribute("y2", startY);
+            interceptor.setAttribute("stroke", "cyan");
+            interceptor.setAttribute("stroke-width", "0.5");
+            svg.appendChild(interceptor);
+
+            let iStartTime = performance.now();
+            const iDuration = customDuration;
+
+            function animateInterceptor(now) {
+                const elapsed = now - iStartTime;
+                const progress = Math.min(elapsed / iDuration, 1);
+
+                const curX = startX + (targetPoint.x - startX) * progress;
+                const curY = startY + (targetPoint.y - startY) * progress;
+
+                interceptor.setAttribute("x2", curX);
+                interceptor.setAttribute("y2", curY);
+
+                if (progress < 1) {
+                    requestAnimationFrame(animateInterceptor);
                 } else {
-                    info.innerText = `[FAILED] Interception attempt ${attempts} failed. Missile still in flight.`;
-                    if (attempts >= maxAttempts) {
-                        clearInterval(checkInterception);
-                        setTimeout(() => {
-                            if (!intercepted) {
-                                info.innerText = "IMPACT CONFIRMED. TARGET DESTROYED.";
-                                info.style.color = '#ff0000';
-                                playSound('alarm');
-                                trajectories.innerHTML += `<circle cx="${dst.coords.x}" cy="${dst.coords.y}" r="10" fill="red" opacity="0.6">
-                                    <animate attributeName="r" from="0" to="20" dur="1s" fill="freeze" />
-                                    <animate attributeName="opacity" from="0.6" to="0" dur="1s" fill="freeze" />
-                                </circle>`;
-                            }
-                        }, 2000);
+                    // Success chance modified by defender rating and missile speed
+                    // Faster missiles are harder to intercept
+                    const missileSpeed = nations[currentState.nation].missiles.find(m => m.id === currentState.missile.id).speed;
+                    const speedFactor = 25000 / missileSpeed;
+                    // Terminal phase (shorter duration) has higher success chance but less time
+                    const phaseBonus = (customDuration < 500) ? 1.5 : 1.0;
+                    const success = Math.random() < (defender.defense * 0.35 * speedFactor * phaseBonus);
+                    if (success) {
+                        interceptor.setAttribute("stroke", "white");
+                        callback(true);
+                    } else {
+                        interceptor.remove();
+                        callback(false);
                     }
                 }
-            }, 2500);
+            }
+            requestAnimationFrame(animateInterceptor);
         }
 
         function showScreen(screenId) {
@@ -679,6 +801,7 @@
 
         function resetToMenu() {
             resetSequence();
+            document.getElementById('telemetry-panel').style.display = 'none';
             showScreen('main-menu');
         }
 
