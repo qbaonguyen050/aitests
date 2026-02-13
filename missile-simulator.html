@@ -219,12 +219,22 @@
 
         <div id="launch-screen" class="screen">
             <h1 id="launch-status">MISSILE AWAY</h1>
-            <div id="animation-container" style="flex: 1; position: relative; overflow: hidden; background: #000;">
-                <svg id="missile-svg" viewBox="0 0 100 100" style="width: 100%; height: 100%;">
-                    <!-- Animation elements will be here -->
+            <div id="animation-container" style="flex: 1; position: relative; overflow: hidden; background: #000; border: 1px solid #333;">
+                <svg id="missile-svg" viewBox="0 0 200 100" style="width: 100%; height: 100%;">
+                    <!-- World Map Background (Simplified) -->
+                    <rect width="200" height="100" fill="#000510" />
+                    <!-- Americas -->
+                    <path d="M20,20 L50,20 L60,40 L50,80 L30,90 L10,60 Z" fill="#112233" />
+                    <!-- Eurasia + Africa -->
+                    <path d="M80,20 L160,15 L180,40 L170,80 L140,85 L100,80 L80,50 Z" fill="#112233" />
+                    <!-- Australia -->
+                    <path d="M160,70 L180,70 L185,85 L165,90 Z" fill="#112233" />
+
+                    <g id="map-markers"></g>
+                    <g id="map-trajectories"></g>
                 </svg>
             </div>
-            <div id="impact-info" style="text-align: center; padding: 20px; font-size: 1.2em;"></div>
+            <div id="impact-info" style="text-align: center; padding: 20px; font-size: 1.2em; min-height: 3em;"></div>
             <button onclick="resetToMenu()">RESET SIMULATOR</button>
         </div>
     </div>
@@ -299,6 +309,8 @@
                 name: "United States of America",
                 color: "#4a90e2",
                 controlType: "LCC_US",
+                coords: { x: 40, y: 40 },
+                defense: 0.85,
                 missiles: [
                     { id: "minuteman", name: "LGM-30G Minuteman III", type: "Silo-based ICBM" },
                     { id: "trident", name: "UGM-133 Trident II (D5)", type: "SLBM" }
@@ -308,6 +320,8 @@
                 name: "Russian Federation",
                 color: "#e30022",
                 controlType: "SOVIET_RU",
+                coords: { x: 120, y: 25 },
+                defense: 0.80,
                 missiles: [
                     { id: "yars", name: "RS-24 Yars", type: "Mobile/Silo ICBM" },
                     { id: "sarmat", name: "RS-28 Sarmat", type: "Heavy ICBM" }
@@ -317,6 +331,8 @@
                 name: "China",
                 color: "#ffde00",
                 controlType: "MODERN_CN",
+                coords: { x: 150, y: 40 },
+                defense: 0.75,
                 missiles: [
                     { id: "df41", name: "DF-41", type: "Road-mobile ICBM" },
                     { id: "df31", name: "DF-31AG", type: "Mobile ICBM" }
@@ -326,6 +342,8 @@
                 name: "DPRK (North Korea)",
                 color: "#ed1c24",
                 controlType: "RUGGED_NK",
+                coords: { x: 165, y: 40 },
+                defense: 0.30,
                 missiles: [
                     { id: "hwasong17", name: "Hwasong-17", type: "Mobile Heavy ICBM" },
                     { id: "hwasong18", name: "Hwasong-18", type: "Solid-fuel ICBM" }
@@ -335,6 +353,8 @@
                 name: "United Kingdom",
                 color: "#00247d",
                 controlType: "RN_UK",
+                coords: { x: 90, y: 30 },
+                defense: 0.70,
                 missiles: [
                     { id: "trident_uk", name: "Trident II (D5)", type: "SLBM (Vanguard-class)" }
                 ]
@@ -343,6 +363,8 @@
                 name: "France",
                 color: "#00209f",
                 controlType: "EU_FR",
+                coords: { x: 92, y: 35 },
+                defense: 0.70,
                 missiles: [
                     { id: "m51", name: "M51", type: "SLBM (Triomphant-class)" }
                 ]
@@ -351,6 +373,8 @@
                 name: "India",
                 color: "#ff9933",
                 controlType: "ISRO_IN",
+                coords: { x: 135, y: 55 },
+                defense: 0.60,
                 missiles: [
                     { id: "agni5", name: "Agni-V", type: "Road-mobile ICBM" }
                 ]
@@ -359,6 +383,8 @@
                 name: "Pakistan",
                 color: "#006600",
                 controlType: "PA_PK",
+                coords: { x: 130, y: 50 },
+                defense: 0.50,
                 missiles: [
                     { id: "shaheen3", name: "Shaheen-III", type: "MRBM" }
                 ]
@@ -367,6 +393,8 @@
                 name: "Israel",
                 color: "#0038b8",
                 controlType: "IDF_IL",
+                coords: { x: 105, y: 45 },
+                defense: 0.90,
                 missiles: [
                     { id: "jericho3", name: "Jericho III", type: "ICBM" }
                 ]
@@ -377,6 +405,7 @@
         let currentState = {
             nation: null,
             missile: null,
+            targetNation: null,
             step: 'idle',
             pal: '',
             keys: { 1: false, 2: false },
@@ -485,10 +514,20 @@
             }
         }
 
-        function setTarget(t) {
+        function setTarget(targetId) {
+            playSound('beep');
+            const targetNation = nations[targetId];
+            currentState.targetNation = targetId;
             currentState.targetSet = true;
-            updateLog(`TARGET SET TO ${t}.`);
-            checkChinaReady();
+            updateLog(`TARGET ACQUIRED: ${targetNation.name.toUpperCase()}.`);
+
+            if (currentState.nation === 'china') checkChinaReady();
+            if (currentState.nation === 'usa') {
+                // If PAL and targeting are both done, keys are already checked in turnKey
+                if (currentState.keys[1] && currentState.keys[2]) {
+                    document.getElementById('launch-btn').disabled = false;
+                }
+            }
         }
 
         function checkChinaReady() {
@@ -505,6 +544,11 @@
         }
 
         function initiateLaunch() {
+            if (!currentState.targetSet) {
+                updateLog("ERROR: NO TARGET SELECTED.");
+                playSound('beep');
+                return;
+            }
             playSound('alarm');
             updateLog("LAUNCH INITIATED!");
             let countdown = 5;
@@ -527,20 +571,105 @@
         }
 
         function startLaunchAnimation() {
-            const svg = document.getElementById('missile-svg');
-            svg.innerHTML = `
-                <text x="10" y="10" fill="red" font-size="5">${currentState.missile.name.toUpperCase()} IN FLIGHT</text>
-                <rect x="49" y="80" width="2" height="10" fill="white">
-                    <animate attributeName="y" from="100" to="-20" dur="5s" fill="freeze" />
-                </rect>
-                <path d="M45,100 Q50,90 55,100" fill="orange">
-                     <animate attributeName="d" values="M45,100 Q50,90 55,100; M45,100 Q50,70 55,100; M45,100 Q50,90 55,100" dur="0.1s" repeatCount="indefinite" />
-                     <animate attributeName="transform" attributeType="XML" type="translate" from="0,0" to="0,-120" dur="5s" fill="freeze" />
-                </path>
+            const markers = document.getElementById('map-markers');
+            const trajectories = document.getElementById('map-trajectories');
+            const info = document.getElementById('impact-info');
+
+            markers.innerHTML = '';
+            trajectories.innerHTML = '';
+            info.innerText = 'MISSILE EN ROUTE...';
+            info.style.color = 'var(--text-color)';
+
+            const src = nations[currentState.nation];
+            const dst = nations[currentState.targetNation];
+
+            // Draw Source and Target Markers
+            markers.innerHTML += `<circle cx="${src.coords.x}" cy="${src.coords.y}" r="2" fill="${src.color}" />`;
+            markers.innerHTML += `<text x="${src.coords.x}" y="${src.coords.y - 4}" fill="${src.color}" font-size="3" text-anchor="middle">${currentState.nation.toUpperCase()}</text>`;
+
+            markers.innerHTML += `<circle cx="${dst.coords.x}" cy="${dst.coords.y}" r="2" fill="${dst.color}" />`;
+            markers.innerHTML += `<text x="${dst.coords.x}" y="${dst.coords.y - 4}" fill="${dst.color}" font-size="3" text-anchor="middle">${currentState.targetNation.toUpperCase()}</text>`;
+
+            // Create Trajectory Arc
+            const midX = (src.coords.x + dst.coords.x) / 2;
+            const midY = Math.min(src.coords.y, dst.coords.y) - 30; // Apex of flight
+
+            const pathData = `M${src.coords.x},${src.coords.y} Q${midX},${midY} ${dst.coords.x},${dst.coords.y}`;
+            trajectories.innerHTML += `
+                <path d="${pathData}" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.5" stroke-dasharray="2,2" />
+                <circle id="icbm-dot" r="1.5" fill="#fff">
+                    <animateMotion dur="10s" path="${pathData}" fill="freeze" id="icbm-motion" />
+                </circle>
             `;
-            setTimeout(() => {
-                document.getElementById('impact-info').innerText = "IMPACT CONFIRMED. TARGET NEUTRALIZED.";
-            }, 4000);
+
+            let attempts = 0;
+            const maxAttempts = 3;
+            let intercepted = false;
+
+            const checkInterception = setInterval(() => {
+                if (intercepted) return;
+
+                attempts++;
+                const progress = attempts / (maxAttempts + 1);
+
+                // Visual Interceptor Launch
+                const interceptorX = dst.coords.x;
+                const interceptorY = dst.coords.y;
+
+                info.innerText = `[DEFENSE] ${dst.name} triggering interception attempt ${attempts}/${maxAttempts}...`;
+                playSound('beep');
+
+                const intId = `interceptor-${attempts}`;
+                trajectories.innerHTML += `
+                    <line x1="${interceptorX}" y1="${interceptorY}" x2="${interceptorX}" y2="${interceptorY}" stroke="cyan" stroke-width="0.5">
+                        <animate attributeName="x2" from="${interceptorX}" to="${dst.coords.x - (dst.coords.x - src.coords.x)*(1-progress)}" dur="1s" fill="freeze" />
+                        <animate attributeName="y2" from="${interceptorY}" to="${dst.coords.y - (dst.coords.y - src.coords.y)*(1-progress) - 10}" dur="1s" fill="freeze" />
+                    </line>
+                `;
+
+                // Animate an interceptor missile
+                const dot = document.getElementById('icbm-dot');
+                if (!dot) return;
+                const bBox = dot.getBBox();
+                const currentX = dot.getCTM().e; // Approximate
+                const currentY = dot.getCTM().f;
+
+                // Simulating interception success based on target defense probability
+                if (Math.random() < dst.defense * 0.4) { // Scaled per attempt
+                    intercepted = true;
+                    clearInterval(checkInterception);
+
+                    // Stop animation
+                    const motion = document.getElementById('icbm-motion');
+                    if (motion) motion.parentNode.removeChild(motion);
+
+                    info.innerText = `[ALERT] MISSILE INTERCEPTED BY ${dst.name.toUpperCase()} DEFENSIVE SYSTEMS.`;
+                    info.style.color = '#00ff00';
+                    playSound('alarm');
+
+                    // Show explosion at impact site
+                    trajectories.innerHTML += `<circle cx="${dst.coords.x - (dst.coords.x - src.coords.x)*(1-progress)}" cy="${dst.coords.y - (dst.coords.y - src.coords.y)*(1-progress) - 10}" r="5" fill="orange" opacity="0.8">
+                        <animate attributeName="r" from="0" to="10" dur="0.5s" fill="freeze" />
+                        <animate attributeName="opacity" from="0.8" to="0" dur="0.5s" fill="freeze" />
+                    </circle>`;
+                } else {
+                    info.innerText = `[FAILED] Interception attempt ${attempts} failed. Missile still in flight.`;
+                    if (attempts >= maxAttempts) {
+                        clearInterval(checkInterception);
+                        setTimeout(() => {
+                            if (!intercepted) {
+                                info.innerText = "IMPACT CONFIRMED. TARGET DESTROYED.";
+                                info.style.color = '#ff0000';
+                                playSound('alarm');
+                                trajectories.innerHTML += `<circle cx="${dst.coords.x}" cy="${dst.coords.y}" r="10" fill="red" opacity="0.6">
+                                    <animate attributeName="r" from="0" to="20" dur="1s" fill="freeze" />
+                                    <animate attributeName="opacity" from="0.6" to="0" dur="1s" fill="freeze" />
+                                </circle>`;
+                            }
+                        }, 2000);
+                    }
+                }
+            }, 2500);
         }
 
         function showScreen(screenId) {
@@ -597,6 +726,11 @@
             const panel = document.getElementById('control-panel');
             const nation = nations[currentState.nation];
 
+            let targetOptions = Object.keys(nations)
+                .filter(k => k !== currentState.nation)
+                .map(k => `<option value="${k}">${nations[k].name}</option>`)
+                .join('');
+
             let controlHTML = `
                 <div class="panel-container">
                     <div class="status-display" id="status-display">
@@ -604,7 +738,15 @@
                         <p>NATION: ${nation.name}</p>
                         <p>STATUS: STANDBY</p>
                         <hr>
-                        <div id="log" style="height: 200px; overflow-y: auto; font-size: 0.8em; color: #88ff88;">
+                        <div style="margin-bottom: 10px;">
+                            <label>SELECT TARGET NATION:</label><br>
+                            <select id="target-selector" onchange="setTarget(this.value)" style="background: #000; color: #0f0; border: 1px solid #0f0; width: 100%;">
+                                <option value="">-- SELECT TARGET --</option>
+                                ${targetOptions}
+                            </select>
+                        </div>
+                        <hr>
+                        <div id="log" style="height: 150px; overflow-y: auto; font-size: 0.8em; color: #88ff88;">
                             [SYSTEM] Initializing command link...<br>
                             [SYSTEM] Secure connection established.<br>
                         </div>
@@ -665,10 +807,7 @@
                             <div id="bio-progress" style="height: 5px; background: #333; margin-top: 5px;"><div id="bio-bar" style="height: 100%; width: 0%; background: #ffde00;"></div></div>
                         </div>
                         <hr>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <button onclick="setTarget('NEW YORK')">TARGET A</button>
-                            <button onclick="setTarget('LOS ANGELES')">TARGET B</button>
-                        </div>
+                        <p style="font-size: 0.8em; text-align: center;">TARGET SELECTION ON MAIN STATUS DISPLAY</p>
                         <button id="launch-btn-cn" disabled style="margin-top: 20px; width: 100%; height: 50px; background: #ffde00; color: #000;" onclick="initiateLaunch()">CONFIRM LAUNCH</button>
                     `;
                 case 'RUGGED_NK':
