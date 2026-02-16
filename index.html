@@ -3,546 +3,337 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BUCKSHOT ROULETTE</title>
+    <title>RUSSIAN ROULETTE 2D</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #1a1a1a; font-family: 'Courier New', Courier, monospace; color: #ffb000; }
-        #game-ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        .log-container { position: absolute; bottom: 20px; left: 20px; max-height: 150px; overflow: hidden; }
-        .log-entry { margin: 2px 0; background: rgba(20,10,0,0.7); border: 1px solid #ffb000; padding: 2px 8px; font-weight: bold; }
-        #interaction-prompt { position: absolute; top: 10%; left: 50%; transform: translateX(-50%); font-size: 20px; text-shadow: 2px 2px #000; color: #ffb000; }
-        canvas { display: block; }
+        body { margin: 0; background: #1a472a; color: #f0c040; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
+        #menu-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
+        .menu-box { background: #222; border: 4px solid #f0c040; padding: 40px; border-radius: 10px; text-align: center; }
+        h1 { font-size: 48px; margin-bottom: 20px; color: #f0c040; }
+        .input-group { margin-bottom: 20px; }
+        label { font-size: 20px; display: block; margin-bottom: 10px; }
+        input { font-size: 20px; padding: 5px; width: 60px; text-align: center; background: #333; color: #fff; border: 2px solid #f0c040; }
+        button { font-size: 24px; padding: 10px 30px; background: #f0c040; color: #222; border: none; cursor: pointer; font-weight: bold; border-radius: 5px; }
+        button:hover { background: #fff; }
+        #canvas { display: block; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .log { position: absolute; bottom: 20px; left: 20px; font-family: monospace; font-size: 18px; max-height: 200px; overflow-y: hidden; }
+        .log-entry { margin: 5px 0; text-shadow: 1px 1px #000; }
     </style>
 </head>
 <body>
-    <canvas id="canvas"></canvas>
-    <div id="game-ui">
-        <div id="interaction-prompt"></div>
-        <div id="log-container" class="log-container"></div>
+    <div id="menu-overlay">
+        <div class="menu-box">
+            <h1>RUSSIAN ROULETTE</h1>
+            <div class="input-group">
+                <label for="ai-count">How many AI opponents? (1-5)</label>
+                <input type="number" id="ai-count" min="1" max="5" value="1">
+            </div>
+            <button id="start-btn">START GAME</button>
+            <div id="controls" style="display:none; margin-top:20px;">
+                <button id="trigger-btn">PULL TRIGGER</button>
+                <button id="spin-btn" style="margin-left:10px; background:#888;">SPIN</button>
+            </div>
+        </div>
     </div>
 
-    <script src="three.min.js"></script>
+    <canvas id="canvas"></canvas>
+    <div id="ui-layer">
+        <div id="log" class="log"></div>
+    </div>
+
     <script>
+        class Renderer {
+            constructor(canvas, game) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.game = game;
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+            }
+
+            resize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            }
+
+            draw() {
+                const ctx = this.ctx;
+                const width = this.canvas.width;
+                const height = this.canvas.height;
+
+                // Background
+                ctx.fillStyle = '#1a472a';
+                ctx.fillRect(0, 0, width, height);
+
+                // Table
+                ctx.beginPath();
+                ctx.ellipse(width / 2, height / 2, width * 0.4, height * 0.35, 0, 0, Math.PI * 2);
+                ctx.fillStyle = '#0a5c2e';
+                ctx.fill();
+                ctx.strokeStyle = '#f0c040';
+                ctx.lineWidth = 10;
+                ctx.stroke();
+
+                // Players
+                const players = this.game.players;
+                const radius = Math.min(width, height) * 0.3;
+                players.forEach((p, i) => {
+                    const angle = (i / players.length) * Math.PI * 2 - Math.PI / 2;
+                    const x = width / 2 + Math.cos(angle) * radius;
+                    const y = height / 2 + Math.sin(angle) * radius;
+
+                    // Draw player circle
+                    ctx.beginPath();
+                    ctx.arc(x, y, 40, 0, Math.PI * 2);
+                    ctx.fillStyle = p.alive ? (this.game.currentPlayerIdx === i ? '#f0c040' : '#444') : '#800';
+                    ctx.fill();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    // Name
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(p.name, x, y + 5);
+                });
+
+                // Revolver representation in center
+                ctx.save();
+                ctx.translate(width / 2, height / 2);
+                // Rotate based on current chamber?
+                ctx.rotate((this.game.revolver.currentChamber / 6) * Math.PI * 2);
+
+                // Draw cylinder
+                ctx.beginPath();
+                ctx.arc(0, 0, 60, 0, Math.PI * 2);
+                ctx.fillStyle = '#333';
+                ctx.fill();
+                ctx.strokeStyle = '#666';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+
+                // Draw chambers
+                for (let i = 0; i < 6; i++) {
+                    const a = (i / 6) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.arc(Math.cos(a) * 35, Math.sin(a) * 35, 12, 0, Math.PI * 2);
+                    ctx.fillStyle = '#111';
+                    ctx.fill();
+                    if (i === 0) { // Indicator for "current" slot (top before rotation)
+                        ctx.strokeStyle = '#f0c040';
+                        ctx.stroke();
+                    }
+                }
+                ctx.restore();
+
+                requestAnimationFrame(() => this.draw());
+            }
+        }
+
+        class Revolver {
+            constructor() {
+                this.chambers = new Array(6).fill(false); // false = blank, true = live
+                this.currentChamber = 0;
+            }
+
+            loadRandom() {
+                this.chambers.fill(false);
+                // Randomly decide how many live rounds (1 to 3)
+                const liveCount = Math.floor(Math.random() * 3) + 1;
+                let loaded = 0;
+                while (loaded < liveCount) {
+                    const idx = Math.floor(Math.random() * 6);
+                    if (!this.chambers[idx]) {
+                        this.chambers[idx] = true;
+                        loaded++;
+                    }
+                }
+                this.currentChamber = Math.floor(Math.random() * 6);
+                return liveCount;
+            }
+
+            spin() {
+                this.currentChamber = Math.floor(Math.random() * 6);
+            }
+
+            pullTrigger() {
+                const isLive = this.chambers[this.currentChamber];
+                // In Russian Roulette, after firing, the next chamber is used.
+                // If it was a blank, we move to the next.
+                // If it was live, the game/round usually resets.
+                const shotIdx = this.currentChamber;
+                this.currentChamber = (this.currentChamber + 1) % 6;
+                return isLive;
+            }
+
+            getPublicInfo() {
+                // Returns how many total chambers are left in the sequence since last load
+                // (Though in this game we just track shots fired)
+                return {
+                    current: this.currentChamber
+                };
+            }
+        }
+
         class Game {
             constructor() {
-                this.playerHP = 0;
-                this.dealerHP = 0;
-                this.maxHP = 4;
-                this.shells = [];
-                this.livesCount = 0;
-                this.blanksCount = 0;
-                this.playerItems = [];
-                this.dealerItems = [];
-                this.turn = 'player';
-                this.isSawed = false;
-                this.handcuffed = { player: false, dealer: false };
-                this.round = 0;
-                this.onUpdate = () => {};
-                this.onAction = () => {};
+                this.players = [];
+                this.revolver = new Revolver();
+                this.currentPlayerIdx = 0;
+                this.isGameOver = false;
+                this.shotsFiredInRound = 0;
+                this.onLog = (msg) => {};
+                this.onStateChange = () => {};
             }
 
-            initRound() {
-                this.round++;
-                this.playerHP = 4;
-                this.dealerHP = 4;
-                this.playerItems = [];
-                this.dealerItems = [];
-                this.loadShells();
-            }
-
-            loadShells() {
-                const count = Math.floor(Math.random() * 7) + 2; // 2-8 shells
-                let lives = Math.ceil(count / 2);
-                if (Math.random() > 0.5 && lives > 1) lives--;
-                let blanks = count - lives;
-
-                this.livesCount = lives;
-                this.blanksCount = blanks;
-                this.shells = [];
-                for(let i=0; i<lives; i++) this.shells.push('live');
-                for(let i=0; i<blanks; i++) this.shells.push('blank');
-
-                // Shuffle
-                for (let i = this.shells.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [this.shells[i], this.shells[j]] = [this.shells[j], this.shells[i]];
+            init(aiCount) {
+                this.players = [{ name: 'PLAYER', isAI: false, alive: true }];
+                for (let i = 0; i < aiCount; i++) {
+                    this.players.push({ name: `AI ${i + 1}`, isAI: true, alive: true });
                 }
-
-                // Give items
-                const itemAmount = Math.min(8 - this.playerItems.length, Math.floor(Math.random() * 3) + 2);
-                for(let i=0; i<itemAmount; i++) {
-                    this.playerItems.push(this.randomItem());
-                    this.dealerItems.push(this.randomItem());
-                }
-
-                this.log(`LOADED: ${lives} LIVE, ${blanks} BLANK`);
-                this.onAction('load', { lives, blanks });
-                this.onUpdate();
+                this.currentPlayerIdx = 0;
+                this.isGameOver = false;
+                this.startRound();
             }
 
-            randomItem() {
-                const items = ['magnifier', 'cigarette', 'beer', 'handcuffs', 'saw'];
-                return items[Math.floor(Math.random() * items.length)];
+            startRound() {
+                const liveCount = this.revolver.loadRandom();
+                this.shotsFiredInRound = 0;
+                this.log(`Round started. ${liveCount} live rounds loaded. Cylinder spun.`);
+                this.onStateChange();
             }
 
             log(msg) {
-                const container = document.getElementById('log-container');
-                const entry = document.createElement('div');
-                entry.className = 'log-entry';
-                entry.innerText = msg.toUpperCase();
-                container.appendChild(entry);
-                if (container.children.length > 5) container.removeChild(container.firstChild);
-                console.log(msg);
+                this.onLog(msg);
             }
 
-            useItem(user, index) {
-                const items = user === 'player' ? this.playerItems : this.dealerItems;
-                const item = items[index];
-                if (!item) return;
+            nextTurn() {
+                if (this.isGameOver) return;
 
-                this.log(`${user} USED ${item}`);
-                let reveal = null;
+                do {
+                    this.currentPlayerIdx = (this.currentPlayerIdx + 1) % this.players.length;
+                } while (!this.players[this.currentPlayerIdx].alive);
 
-                switch(item) {
-                    case 'magnifier':
-                        reveal = this.shells[0];
-                        if (user === 'player') this.log(`CURRENT SHELL IS ${reveal}`);
-                        break;
-                    case 'cigarette':
-                        if (user === 'player') this.playerHP = Math.min(this.playerHP + 1, 6);
-                        else this.dealerHP = Math.min(this.dealerHP + 1, 6);
-                        break;
-                    case 'beer':
-                        const ejected = this.shells.shift();
-                        if (ejected === 'live') this.livesCount--; else this.blanksCount--;
-                        this.log(`EJECTED ${ejected} SHELL`);
-                        break;
-                    case 'handcuffs':
-                        if (user === 'player') this.handcuffed.dealer = true;
-                        else this.handcuffed.player = true;
-                        break;
-                    case 'saw':
-                        this.isSawed = true;
-                        break;
+                this.onStateChange();
+
+                if (this.players[this.currentPlayerIdx].isAI) {
+                    setTimeout(() => this.aiTurn(), 1500);
                 }
-
-                items.splice(index, 1);
-                this.onAction('item', { user, item, reveal });
-                this.onUpdate();
-                if (this.shells.length === 0) this.loadShells();
             }
 
-            shoot(target) {
-                if (this.shells.length === 0) return;
-                const shell = this.shells.shift();
-                const isLive = shell === 'live';
-                if (isLive) this.livesCount--; else this.blanksCount--;
+            pullTrigger() {
+                const player = this.players[this.currentPlayerIdx];
+                this.log(`${player.name} pulls the trigger...`);
 
-                const damage = this.isSawed ? 2 : 1;
-                this.isSawed = false;
-
-                this.onAction('shoot', { shooter: this.turn, target, isLive, damage });
+                const isLive = this.revolver.pullTrigger();
+                this.shotsFiredInRound++;
 
                 if (isLive) {
-                    if (target === 'player') this.playerHP -= damage;
-                    else this.dealerHP -= damage;
-                    this.log(`${this.turn} SHOT ${target} FOR ${damage} DAMAGE`);
-                    if (this.checkGameOver()) return;
-                    this.endTurn(true);
-                } else {
-                    this.log(`${this.turn} SHOT A BLANK AT ${target}`);
-                    if (this.turn === target) {
-                        // Shooting self with blank grants extra turn
-                        this.log(`EXTRA TURN FOR ${this.turn}`);
-                        this.onUpdate();
-                        if (this.shells.length === 0) this.loadShells();
+                    this.log(`BOOM! ${player.name} is eliminated.`);
+                    player.alive = false;
+
+                    const alivePlayers = this.players.filter(p => p.alive);
+                    if (alivePlayers.length === 1) {
+                        this.log(`GAME OVER! ${alivePlayers[0].name} WINS!`);
+                        this.isGameOver = true;
                     } else {
-                        this.endTurn(false);
+                        setTimeout(() => this.startRound(), 2000);
                     }
-                }
-            }
-
-            endTurn(wasHit) {
-                const next = this.turn === 'player' ? 'dealer' : 'player';
-                if (this.handcuffed[next]) {
-                    this.handcuffed[next] = false;
-                    this.log(`${next} IS HANDCUFFED, SKIP TURN`);
                 } else {
-                    this.turn = next;
+                    this.log(`*click*. ${player.name} survives.`);
+                    setTimeout(() => this.nextTurn(), 1000);
                 }
-                this.onUpdate();
-                if (this.shells.length === 0) this.loadShells();
+                this.onStateChange();
             }
 
-            checkGameOver() {
-                if (this.playerHP <= 0 || this.dealerHP <= 0) {
-                    this.log(`GAME OVER. ${this.playerHP > 0 ? 'PLAYER' : 'DEALER'} WINS.`);
-                    this.onAction('gameOver', this.playerHP > 0 ? 'player' : 'dealer');
-                    return true;
+            spin() {
+                const player = this.players[this.currentPlayerIdx];
+                this.log(`${player.name} spins the cylinder.`);
+                this.revolver.spin();
+                this.onStateChange();
+                // After spinning, the player MUST still pull the trigger or it's just stalling.
+                // In some variants spinning is a choice. Here we'll allow it once per turn?
+                // For simplicity, let's say AI might spin.
+            }
+
+            aiTurn() {
+                const decision = this.aiController.makeDecision(this.shotsFiredInRound);
+                if (decision === 'spin') {
+                    this.spin();
+                    // After spinning, AI must fire (rules of this game variant)
+                    setTimeout(() => this.pullTrigger(), 1000);
+                } else {
+                    this.pullTrigger();
                 }
-                return false;
             }
         }
 
-        class AudioController {
+        class RussianRouletteAI {
             constructor() {
-                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                // AI doesn't know the revolver's internal state
             }
 
-            playShot() {
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'sawtooth';
-                gain.gain.setValueAtTime(1, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.5);
-
-                const noise = this.ctx.createBufferSource();
-                const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.5, this.ctx.sampleRate);
-                const data = buffer.getChannelData(0);
-                for(let i=0; i<data.length; i++) data[i] = Math.random() * 2 - 1;
-                noise.buffer = buffer;
-                const noiseGain = this.ctx.createGain();
-                noiseGain.gain.setValueAtTime(0.5, this.ctx.currentTime);
-                noiseGain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
-                noise.connect(noiseGain);
-                noiseGain.connect(this.ctx.destination);
-                noise.start();
-            }
-
-            playClick() {
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(100, this.ctx.currentTime);
-                gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.05);
-            }
-
-            playLoad() {
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'square';
-                osc.frequency.setValueAtTime(50, this.ctx.currentTime);
-                gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.1);
+            makeDecision(shotsFired) {
+                // Heuristic: If shots fired is high, probability of live is higher.
+                if (shotsFired >= 3 && Math.random() < 0.3) {
+                    return 'spin';
+                }
+                return 'fire';
             }
         }
 
-        class Graphics {
-            updateHP(playerHP, dealerHP) {
-                // Update HP visuals (simplistic implementation)
-                document.getElementById('interaction-prompt').innerText = `HP: ${playerHP} | DEALER: ${dealerHP}`;
-                this.updateItems();
-            }
+        // --- Initialization ---
+        window.addEventListener('load', () => {
+            const game = new Game();
+            const renderer = new Renderer(document.getElementById('canvas'), game);
+            const menu = document.getElementById('menu-overlay');
+            const startBtn = document.getElementById('start-btn');
+            const aiCountInput = document.getElementById('ai-count');
+            const controls = document.getElementById('controls');
+            const triggerBtn = document.getElementById('trigger-btn');
+            const spinBtn = document.getElementById('spin-btn');
+            const logElement = document.getElementById('log');
 
-            updateItems() {
-                if (this.itemGroup) this.scene.remove(this.itemGroup);
-                this.itemGroup = new THREE.Group();
-
-                this.game.playerItems.forEach((item, i) => {
-                    const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-                    const mat = new THREE.MeshStandardMaterial({ color: this.getItemColor(item) });
-                    const mesh = new THREE.Mesh(geo, mat);
-                    mesh.position.set(-1.5 + i * 0.3, 0.9, 1);
-                    mesh.userData = { interactable: true, type: 'item', index: i };
-                    this.itemGroup.add(mesh);
-                });
-
-                this.scene.add(this.itemGroup);
-            }
-
-            getItemColor(item) {
-                const colors = { magnifier: 0x0000ff, cigarette: 0xffffff, beer: 0xffff00, handcuffs: 0x888888, saw: 0xff0000 };
-                return colors[item] || 0x00ff00;
-            }
-
-            animateShotgun(shooter, target, isLive, callback) {
-                // Simplistic animation: rotate shotgun towards target
-                const rotY = target === 'player' ? Math.PI : 0;
-                this.shotgun.rotation.y = rotY;
-                this.shotgun.position.y = 1.2;
-
-                setTimeout(() => {
-                    if (isLive) {
-                        this.shotgun.position.z += 0.1;
-                        setTimeout(() => this.shotgun.position.z -= 0.1, 100);
-                    }
-                    setTimeout(() => {
-                        this.shotgun.rotation.y = 0;
-                        this.shotgun.position.y = 0.95;
-                        callback();
-                    }, 500);
-                }, 500);
-            }
-
-            constructor(game) {
-                this.game = game;
-                this.scene = new THREE.Scene();
-                this.scene.background = new THREE.Color(0x0a0a0a);
-                this.scene.fog = new THREE.Fog(0x0a0a0a, 2, 12);
-
-                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-                this.camera.position.set(0, 1.8, 4);
-                this.camera.lookAt(0, 0.5, 0);
-
-                this.renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), antialias: true });
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.shadowMap.enabled = true;
-
-                this.setupLighting();
-                this.createAssets();
-
-                window.addEventListener('resize', () => this.onResize());
-            }
-
-            setupLighting() {
-                const ambient = new THREE.AmbientLight(0x111111);
-                this.scene.add(ambient);
-
-                this.spotlight = new THREE.SpotLight(0xffffff, 2);
-                this.spotlight.position.set(0, 5, 0);
-                this.spotlight.angle = Math.PI / 6;
-                this.spotlight.penumbra = 0.5;
-                this.spotlight.castShadow = true;
-                this.scene.add(this.spotlight);
-            }
-
-            createAssets() {
-                // Table
-                const tableGeo = new THREE.BoxGeometry(4, 0.1, 3);
-                const tableMat = new THREE.MeshStandardMaterial({ color: 0x2a1a0a, roughness: 0.9, metalness: 0.1 });
-                const table = new THREE.Mesh(tableGeo, tableMat);
-                table.position.y = 0.8;
-                table.receiveShadow = true;
-                this.scene.add(table);
-
-                // Shotgun
-                this.shotgun = new THREE.Group();
-                const barrelGeo = new THREE.CylinderGeometry(0.05, 0.05, 1, 16);
-                const metalMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9, roughness: 0.3 });
-                const barrel = new THREE.Mesh(barrelGeo, metalMat);
-                barrel.rotation.x = Math.PI / 2;
-                barrel.position.z = -0.3;
-                barrel.castShadow = true;
-                this.shotgun.add(barrel);
-
-                const receiverGeo = new THREE.BoxGeometry(0.15, 0.15, 0.4);
-                const receiver = new THREE.Mesh(receiverGeo, metalMat);
-                receiver.position.z = 0.2;
-                receiver.castShadow = true;
-                this.shotgun.add(receiver);
-
-                const stockGeo = new THREE.BoxGeometry(0.1, 0.2, 0.4);
-                const woodMat = new THREE.MeshStandardMaterial({ color: 0x1a0d00, roughness: 0.9 });
-                const stock = new THREE.Mesh(stockGeo, woodMat);
-                stock.position.z = 0.6;
-                stock.castShadow = true;
-                this.shotgun.add(stock);
-
-                this.shotgun.position.set(0, 0.95, 0);
-                this.scene.add(this.shotgun);
-
-                // Dealer
-                this.dealer = new THREE.Group();
-                const bodyGeo = new THREE.CylinderGeometry(0.4, 0.6, 1.5, 16);
-                const dealerMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
-                const body = new THREE.Mesh(bodyGeo, dealerMat);
-                body.position.y = 0.75;
-                this.dealer.add(body);
-
-                const headGeo = new THREE.SphereGeometry(0.25, 16, 16);
-                const head = new THREE.Mesh(headGeo, dealerMat);
-                head.position.y = 1.6;
-                this.dealer.add(head);
-
-                this.dealer.position.set(0, 0.8, -1.8);
-                this.scene.add(this.dealer);
-            }
-
-            onResize() {
-                this.camera.aspect = window.innerWidth / window.innerHeight;
-                this.camera.updateProjectionMatrix();
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-            }
-
-            render() {
-                this.renderer.render(this.scene, this.camera);
-            }
-        }
-
-        let game, graphics, audio, ai;
-
-        function init() {
-            game = new Game();
-            graphics = new Graphics(game);
-            audio = new AudioController();
-            ai = new DealerAI(game);
-
-            game.onUpdate = () => {
-                graphics.updateHP(game.playerHP, game.dealerHP);
-                if (game.turn === 'dealer' && game.playerHP > 0 && game.dealerHP > 0) {
-                    setTimeout(dealerTurn, 1000);
+            game.onLog = (msg) => {
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                entry.innerText = msg;
+                logElement.appendChild(entry);
+                logElement.scrollTop = logElement.scrollHeight;
+                if (logElement.children.length > 8) {
+                    logElement.removeChild(logElement.firstChild);
                 }
             };
 
-            game.onAction = (action, data) => {
-                if (action === 'shoot') {
-                    if (data.isLive) audio.playShot(); else audio.playClick();
-                    graphics.animateShotgun(data.shooter, data.target, data.isLive, () => {});
-                } else if (action === 'load') {
-                    audio.playLoad();
-                } else if (action === 'item') {
-                    audio.playLoad();
-                    if (data.user === 'dealer' && data.item === 'magnifier') {
-                        ai.knownShell = data.reveal;
-                    }
+            game.onStateChange = () => {
+                const currentPlayer = game.players[game.currentPlayerIdx];
+                if (!game.isGameOver && currentPlayer && !currentPlayer.isAI) {
+                    controls.style.display = 'block';
+                } else {
+                    controls.style.display = 'none';
                 }
             };
 
-            document.addEventListener('mousedown', onMouseDown);
+            startBtn.addEventListener('click', () => {
+                const aiCount = parseInt(aiCountInput.value) || 1;
+                game.init(aiCount);
+                menu.style.background = 'transparent';
+                menu.style.pointerEvents = 'none';
+                document.querySelector('.menu-box h1').style.display = 'none';
+                document.querySelector('.input-group').style.display = 'none';
+                startBtn.style.display = 'none';
+                renderer.draw();
+            });
 
-            game.initRound();
-            animate();
-        }
+            triggerBtn.addEventListener('click', () => {
+                game.pullTrigger();
+            });
 
-        let isShotgunEquipped = false;
-
-        function onMouseDown(event) {
-            if (game.turn !== 'player') return;
-
-            const mouse = new THREE.Vector2();
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(mouse, graphics.camera);
-            const intersects = raycaster.intersectObjects(graphics.scene.children, true);
-
-            if (intersects.length > 0) {
-                let hit = intersects[0];
-                let obj = hit.object;
-                while(obj.parent && !obj.userData.interactable) obj = obj.parent;
-
-                const data = obj.userData;
-                if (!data.interactable) return;
-
-                if (data.type === 'shotgun') {
-                    isShotgunEquipped = true;
-                    graphics.shotgun.position.set(0, 1.4, 2); // Bring it closer
-                    game.log("AIM AT DEALER OR YOURSELF");
-                } else if (data.type === 'dealer') {
-                    if (isShotgunEquipped) {
-                        game.shoot('dealer');
-                        isShotgunEquipped = false;
-                    }
-                } else if (data.type === 'self') {
-                    if (isShotgunEquipped) {
-                        game.shoot('player');
-                        isShotgunEquipped = false;
-                    }
-                } else if (data.type === 'item') {
-                    game.useItem('player', data.index);
-                }
-            }
-        }
-
-        function dealerTurn() {
-            const decision = ai.makeDecision();
-            if (!decision) return;
-
-            if (decision.type === 'item') {
-                game.useItem('dealer', decision.index);
-            } else {
-                game.shoot(decision.target);
-                if (decision.target === 'player' || (decision.target === 'dealer' && game.shells.length > 0)) {
-                    ai.knownShell = null;
-                }
-            }
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            graphics.render();
-        }
-
-        window.onload = init;
-
-        class DealerAI {
-            constructor(game) {
-                this.game = game;
-                this.knownShell = null;
-            }
-
-            // ISOLATION: The AI only sees what it's supposed to.
-            getFilteredState() {
-                return {
-                    myHP: this.game.dealerHP,
-                    myItems: [...this.game.dealerItems],
-                    livesCount: this.game.livesCount,
-                    blanksCount: this.game.blanksCount,
-                    isSawed: this.game.isSawed,
-                    knownShell: this.knownShell
-                };
-            }
-
-            makeDecision() {
-                const state = this.getFilteredState();
-                const total = state.livesCount + state.blanksCount;
-                if (total === 0) return null;
-
-                const probLive = state.livesCount / total;
-
-                // 1. Use magnifier if shell unknown and available
-                if (this.knownShell === null && state.myItems.includes('magnifier')) {
-                    const idx = state.myItems.indexOf('magnifier');
-                    return { type: 'item', index: idx };
-                }
-
-                // 2. Heal if low HP and available
-                if (state.myHP < 3 && state.myItems.includes('cigarette')) {
-                    const idx = state.myItems.indexOf('cigarette');
-                    return { type: 'item', index: idx };
-                }
-
-                // 3. Known shell logic
-                if (this.knownShell === 'live') {
-                    if (!state.isSawed && state.myItems.includes('saw')) {
-                        return { type: 'item', index: state.myItems.indexOf('saw') };
-                    }
-                    if (state.myItems.includes('handcuffs')) {
-                        return { type: 'item', index: state.myItems.indexOf('handcuffs') };
-                    }
-                    return { type: 'shoot', target: 'player' };
-                }
-                if (this.knownShell === 'blank') {
-                    return { type: 'shoot', target: 'dealer' };
-                }
-
-                // 4. Probability based logic
-                if (probLive > 0.5) {
-                    if (probLive > 0.7 && !state.isSawed && state.myItems.includes('saw')) {
-                        return { type: 'item', index: state.myItems.indexOf('saw') };
-                    }
-                    return { type: 'shoot', target: 'player' };
-                } else if (probLive < 0.5 && total > 1) {
-                    return { type: 'shoot', target: 'dealer' };
-                }
-
-                // 5. Default
-                return { type: 'shoot', target: 'player' };
-            }
-        }
+            spinBtn.addEventListener('click', () => {
+                game.spin();
+            });
+        });
     </script>
 </body>
 </html>
