@@ -4,9 +4,9 @@ body, html {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background-color: #050505;
+    background-color: #000;
     font-family: 'Courier New', Courier, monospace;
-    color: #00ff00;
+    color: #0f0;
 }
 
 #game-container {
@@ -16,12 +16,7 @@ body, html {
 }
 
 #three-canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1;
+    display: block;
 }
 
 #ui-overlay {
@@ -30,104 +25,37 @@ body, html {
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: 2;
     pointer-events: none;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 20px;
-    box-sizing: border-box;
-    text-shadow: 0 0 5px #00ff00;
+    z-index: 10;
 }
 
-#terminal {
-    background: rgba(0, 20, 0, 0.7);
-    border: 1px solid #00ff00;
-    padding: 10px;
-    height: 150px;
-    overflow-y: auto;
-    font-size: 14px;
-    pointer-events: auto;
-    box-shadow: inset 0 0 10px #003300;
-}
-
-#output {
-    margin-bottom: 10px;
-}
-
-#status-bar {
-    display: flex;
-    justify-content: space-between;
-    border-top: 1px solid #00ff00;
-    padding-top: 5px;
-    font-weight: bold;
-}
-
-#shell-info {
-    text-align: center;
-    font-size: 12px;
-    margin-top: 5px;
-}
-
-#controls {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    pointer-events: auto;
-}
-
-.game-btn {
-    background: #000;
-    color: #00ff00;
-    border: 1px solid #00ff00;
-    padding: 10px 20px;
-    cursor: pointer;
-    font-family: inherit;
-    font-size: 16px;
-    transition: all 0.2s;
-}
-
-.game-btn:hover {
-    background: #00ff00;
-    color: #000;
-}
-
-.game-btn:disabled {
-    border-color: #003300;
-    color: #003300;
-    cursor: not-allowed;
-}
-
-#item-buttons {
-    display: flex;
-    gap: 5px;
-}
-
-.item-btn {
-    font-size: 12px;
-    padding: 5px 10px;
-}
-
-/* CRT effect */
-#ui-overlay::after {
-    content: " ";
-    display: block;
-    position: absolute;
+#crt-overlay {
+    position: fixed;
     top: 0;
     left: 0;
-    bottom: 0;
-    right: 0;
-    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-    z-index: 10;
-    background-size: 100% 4px, 3px 100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+    background-size: 100% 3px, 3px 100%;
     pointer-events: none;
+    z-index: 100;
+    animation: flicker 0.15s infinite;
 }
 
-.log-entry {
-    margin-bottom: 2px;
+@keyframes flicker {
+    0% { opacity: 0.9; }
+    50% { opacity: 1; }
+    100% { opacity: 0.95; }
 }
 
-.log-dealer { color: #ff0000; }
-.log-player { color: #00ff00; }
-.log-system { color: #ffff00; }
+#interaction-prompt {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 24px;
+    text-shadow: 0 0 10px #0f0;
+    letter-spacing: 2px;
+    pointer-events: none;
+    opacity: 0.8;
+}

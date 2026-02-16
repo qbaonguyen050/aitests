@@ -3,74 +3,80 @@ class DealerAI {
         this.game = game;
     }
 
-    makeDecision() {
-        // Prepare a restricted state
-        const state = {
-            myLives: this.game.dealerLives,
-            opponentLives: this.game.playerLives,
+    // The ONLY way the AI gets data is through this method
+    getFilteredState() {
+        return {
+            myHP: this.game.dealerHP,
+            opponentHP: this.game.playerHP,
             myItems: [...this.game.dealerItems],
             opponentItems: [...this.game.playerItems],
-            liveLeft: this.game.liveLeft,
-            blankLeft: this.game.blankLeft,
-            knownShell: this.game.knownShell, // This is only set if AI used magnifier
-            isHandcuffed: this.game.isHandcuffed.player,
-            isSawed: this.game.isSawed
+            livesInGun: this.game.livesInGun,
+            blanksInGun: this.game.blanksInGun,
+            knownShell: this.game.knownShell,
+            isSawed: this.game.isSawed,
+            opponentHandcuffed: this.game.isHandcuffed.player
         };
+    }
 
+    makeDecision() {
+        const state = this.getFilteredState();
         return this.analyze(state);
     }
 
     analyze(state) {
-        const total = state.liveLeft + state.blankLeft;
-        const probLive = state.liveLeft / total;
+        const { myHP, opponentHP, myItems, livesInGun, blanksInGun, knownShell, isSawed } = state;
+        const total = livesInGun + blanksInGun;
+        const probLive = livesInGun / total;
 
-        // 1. Use Items
-
-        // Use Magnifier if we don't know the shell
-        if (state.knownShell === null && state.myItems.includes('magnifier')) {
-            return { action: 'useItem', item: 'magnifier', index: state.myItems.indexOf('magnifier') };
+        // 1. Mandatory Heals
+        if (myHP <= 2 && myItems.includes('cigarette')) {
+            return { action: 'item', index: myItems.indexOf('cigarette') };
         }
 
-        // Use Cigarette if we need health
-        if (state.myLives < 4 && state.myItems.includes('cigarette')) {
-            return { action: 'useItem', item: 'cigarette', index: state.myItems.indexOf('cigarette') };
+        // 2. Information Gathering
+        if (knownShell === null && myItems.includes('magnifier')) {
+            return { action: 'item', index: myItems.indexOf('magnifier') };
         }
 
-        // If we know the shell
-        if (state.knownShell === 'live') {
-            if (!state.isSawed && state.myItems.includes('saw')) {
-                return { action: 'useItem', item: 'saw', index: state.myItems.indexOf('saw') };
+        // 3. Known Shell Logic
+        if (knownShell === 'live') {
+            if (!isSawed && myItems.includes('saw')) {
+                return { action: 'item', index: myItems.indexOf('saw') };
             }
-            if (!state.isHandcuffed && state.myItems.includes('handcuffs')) {
-                 return { action: 'useItem', item: 'handcuffs', index: state.myItems.indexOf('handcuffs') };
+            if (!state.opponentHandcuffed && myItems.includes('handcuffs')) {
+                return { action: 'item', index: myItems.indexOf('handcuffs') };
             }
             return { action: 'shoot', target: 'player' };
         }
 
-        if (state.knownShell === 'blank') {
-            return { action: 'shoot', target: 'dealer' };
+        if (knownShell === 'blank') {
+            return { action: 'shoot', target: 'dealer' }; // Shoot self for extra turn
         }
 
-        // Probability based
+        // 4. Probability Logic (No known shell)
+
+        // If high chance of blank, shoot self
+        if (probLive < 0.3 && total > 1) {
+             return { action: 'shoot', target: 'dealer' };
+        }
+
+        // If high chance of live, use saw/handcuffs then shoot player
         if (probLive > 0.5) {
-            if (!state.isHandcuffed && state.myItems.includes('handcuffs')) {
-                return { action: 'useItem', item: 'handcuffs', index: state.myItems.indexOf('handcuffs') };
+            if (!isSawed && myItems.includes('saw') && probLive > 0.7) {
+                return { action: 'item', index: myItems.indexOf('saw') };
             }
-            if (probLive > 0.7 && !state.isSawed && state.myItems.includes('saw')) {
-                return { action: 'useItem', item: 'saw', index: state.myItems.indexOf('saw') };
+            if (!state.opponentHandcuffed && myItems.includes('handcuffs') && total > 1) {
+                return { action: 'item', index: myItems.indexOf('handcuffs') };
             }
             return { action: 'shoot', target: 'player' };
-        } else {
-            // High chance of blank, shoot self to get another turn
-            if (state.blankLeft > state.liveLeft) {
-                return { action: 'shoot', target: 'dealer' };
-            } else {
-                // equal or slightly less, maybe use beer?
-                if (state.myItems.includes('beer')) {
-                    return { action: 'useItem', item: 'beer', index: state.myItems.indexOf('beer') };
-                }
-                return { action: 'shoot', target: 'player' };
-            }
         }
+
+        // 5. Item usage to tilt odds
+        if (probLive === 0.5 && myItems.includes('beer')) {
+            return { action: 'item', index: myItems.indexOf('beer') };
+        }
+
+        // Default: Shoot player if odds are 50/50 or unknown
+        return { action: 'shoot', target: 'player' };
     }
 }

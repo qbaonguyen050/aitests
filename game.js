@@ -1,98 +1,140 @@
 class Game {
     constructor() {
-        this.maxLives = 4;
-        this.playerLives = this.maxLives;
-        this.dealerLives = this.maxLives;
+        this.maxHP = 4;
+        this.playerHP = 0;
+        this.dealerHP = 0;
         this.playerItems = [];
         this.dealerItems = [];
-        this.shells = []; // Array of 'live' or 'blank'
-        this.currentShell = null;
-        this.turn = 'player'; // 'player' or 'dealer'
+        this.shells = []; // 'live' or 'blank'
+        this.currentRound = 0;
+
+        this.turn = 'player';
         this.isHandcuffed = { player: false, dealer: false };
         this.isSawed = false;
-        this.knownShell = null; // Used by Magnifying Glass
-        this.initialLiveCount = 0;
-        this.initialBlankCount = 0;
-        this.liveLeft = 0;
-        this.blankLeft = 0;
 
-        this.itemTypes = ['magnifier', 'cigarette', 'beer', 'handcuffs', 'saw'];
+        this.livesInGun = 0;
+        this.blanksInGun = 0;
+        this.knownShell = null; // Revealed by magnifier for AI
 
-        this.onLog = (msg, type) => console.log(`[${type}] ${msg}`);
+        this.history = [];
         this.onUpdate = () => {};
-        this.onGameOver = (winner) => {};
+        this.onLog = () => {};
+        this.onAction = () => {}; // For graphics triggers
+
+        this.itemPool = ['magnifier', 'cigarette', 'beer', 'handcuffs', 'saw'];
     }
 
-    startRound() {
-        this.onLog("New round starting...", "system");
-        this.playerLives = Math.min(this.playerLives, 4);
-        this.dealerLives = Math.min(this.dealerLives, 4);
+    log(msg, type = 'system') {
+        this.history.push({ msg, type });
+        this.onLog(msg, type);
+    }
 
-        const shellCount = Math.floor(Math.random() * 7) + 2; // 2 to 8 shells
-        let livesCount = Math.floor(shellCount / 2) + (Math.random() > 0.5 ? 1 : 0);
-        if (livesCount === 0) livesCount = 1;
-        if (livesCount === shellCount) livesCount = shellCount - 1;
+    initRound() {
+        this.currentRound++;
+        this.playerHP = Math.floor(Math.random() * 3) + 2; // 2-4 HP
+        this.dealerHP = this.playerHP;
+        this.playerItems = [];
+        this.dealerItems = [];
+        this.isHandcuffed = { player: false, dealer: false };
+        this.isSawed = false;
+        this.turn = 'player';
 
-        const blanksCount = shellCount - livesCount;
+        this.log(`--- ROUND ${this.currentRound} ---`);
+        this.loadShells();
+    }
 
+    loadShells() {
+        const count = Math.floor(Math.random() * 7) + 2; // 2 to 8 shells
+        let lives = Math.ceil(count / 2);
+        if (Math.random() > 0.5 && lives < count && lives > 1) lives--;
+        if (lives === 0) lives = 1;
+
+        const blanks = count - lives;
         this.shells = [];
-        for (let i = 0; i < livesCount; i++) this.shells.push('live');
-        for (let i = 0; i < blanksCount; i++) this.shells.push('blank');
+        for (let i = 0; i < lives; i++) this.shells.push('live');
+        for (let i = 0; i < blanks; i++) this.shells.push('blank');
 
-        this.shuffle(this.shells);
-        this.initialLiveCount = livesCount;
-        this.initialBlankCount = blanksCount;
-        this.liveLeft = livesCount;
-        this.blankLeft = blanksCount;
+        // Shuffle
+        for (let i = this.shells.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.shells[i], this.shells[j]] = [this.shells[j], this.shells[i]];
+        }
 
-        this.onLog(`Loaded ${livesCount} live, ${blanksCount} blank shells.`, "system");
+        this.log(`The dealer inserts ${lives} live and ${blanks} blank shells.`, 'system');
+        this.livesInGun = lives;
+        this.blanksInGun = blanks;
+        this.knownShell = null;
 
-        // Give items
-        const itemGrantCount = Math.floor(Math.random() * 3) + 2;
-        for (let i = 0; i < itemGrantCount; i++) {
+        // Grant items
+        const itemAmount = Math.floor(Math.random() * 3) + 2;
+        for (let i = 0; i < itemAmount; i++) {
             if (this.playerItems.length < 8) this.playerItems.push(this.randomItem());
             if (this.dealerItems.length < 8) this.dealerItems.push(this.randomItem());
         }
 
         this.onUpdate();
-    }
-
-    shuffle(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
+        this.onAction('load', { lives, blanks });
     }
 
     randomItem() {
-        return this.itemTypes[Math.floor(Math.random() * this.itemTypes.length)];
+        return this.itemPool[Math.floor(Math.random() * this.itemPool.length)];
     }
 
-    useItem(user, itemIndex) {
-        const items = user === 'player' ? this.playerItems : this.dealerItems;
-        const item = items[itemIndex];
+    shoot(target) {
+        if (this.shells.length === 0) return;
 
-        this.onLog(`${user.toUpperCase()} used ${item}.`, user);
+        const shell = this.shells.shift();
+        const isLive = shell === 'live';
+        if (isLive) this.livesInGun--; else this.blanksInGun--;
+        this.knownShell = null;
 
+        const damage = this.isSawed ? 2 : 1;
+        this.isSawed = false;
+
+        this.log(`${this.turn.toUpperCase()} aims at ${target.toUpperCase()}.`, this.turn);
+        this.onAction('shoot', { shooter: this.turn, target, isLive, damage });
+
+        if (isLive) {
+            this.log("BOOM!", 'system');
+            if (target === 'player') this.playerHP -= damage;
+            else this.dealerHP -= damage;
+
+            if (this.checkGameOver()) return;
+            this.endTurn(true);
+        } else {
+            this.log("Click.", 'system');
+            if (this.turn === target) {
+                this.log(`${this.turn.toUpperCase()} gets another turn.`, 'system');
+                this.onUpdate();
+                if (this.shells.length === 0) this.loadShells();
+            } else {
+                this.endTurn(false);
+            }
+        }
+    }
+
+    useItem(user, index) {
+        const item = user === 'player' ? this.playerItems[index] : this.dealerItems[index];
+        if (!item) return;
+
+        this.log(`${user.toUpperCase()} uses ${item.toUpperCase()}.`, user);
+
+        let reveal = null;
         switch (item) {
             case 'magnifier':
-                const result = this.shells[0];
-                if (user === 'player') {
-                    this.onLog(`The current shell is ${result}.`, "system");
-                } else {
-                    this.knownShell = result;
-                }
+                reveal = this.shells[0];
+                if (user === 'player') this.log(`Current shell is ${reveal}.`, 'system');
+                else this.knownShell = reveal;
                 break;
             case 'cigarette':
-                if (user === 'player') this.playerLives = Math.min(this.playerLives + 1, 6);
-                else this.dealerLives = Math.min(this.dealerLives + 1, 6);
+                if (user === 'player') this.playerHP = Math.min(this.playerHP + 1, 6);
+                else this.dealerHP = Math.min(this.dealerHP + 1, 6);
                 break;
             case 'beer':
                 const ejected = this.shells.shift();
-                if (ejected === 'live') this.liveLeft--;
-                else this.blankLeft--;
+                if (ejected === 'live') this.livesInGun--; else this.blanksInGun--;
                 this.knownShell = null;
-                this.onLog(`Ejected a ${ejected} shell.`, "system");
+                this.log(`Ejected a ${ejected} shell.`, 'system');
                 break;
             case 'handcuffs':
                 if (user === 'player') this.isHandcuffed.dealer = true;
@@ -103,76 +145,40 @@ class Game {
                 break;
         }
 
-        items.splice(itemIndex, 1);
+        if (user === 'player') this.playerItems.splice(index, 1);
+        else this.dealerItems.splice(index, 1);
+
+        this.onAction('item', { user, item, reveal });
         this.onUpdate();
 
-        if (this.shells.length === 0) {
-            this.startRound();
-        }
+        if (this.shells.length === 0) this.loadShells();
     }
 
-    shoot(target) {
-        const shell = this.shells.shift();
-        if (shell === 'live') this.liveLeft--;
-        else this.blankLeft--;
+    endTurn(wasHit) {
+        const next = this.turn === 'player' ? 'dealer' : 'player';
 
-        const damage = this.isSawed ? 2 : 1;
-        this.isSawed = false;
-
-        this.onLog(`${this.turn.toUpperCase()} shot ${target.toUpperCase()}...`, this.turn);
-
-        if (shell === 'live') {
-            this.onLog("BANG! It was live.", "system");
-            if (target === 'player') this.playerLives -= damage;
-            else this.dealerLives -= damage;
-
-            this.knownShell = null;
-            this.checkGameOver();
-            this.nextTurn(true);
+        if (this.isHandcuffed[next]) {
+            this.isHandcuffed[next] = false;
+            this.log(`${next.toUpperCase()} is handcuffed. Turn skipped.`, 'system');
         } else {
-            this.onLog("CLICK. It was blank.", "system");
-            this.knownShell = null;
-            if (this.turn === 'player' && target === 'player') {
-                // Shoot self with blank = extra turn
-                this.onLog("Extra turn for Player.", "system");
-                this.onUpdate();
-            } else if (this.turn === 'dealer' && target === 'dealer') {
-                this.onLog("Extra turn for Dealer.", "system");
-                this.onUpdate();
-            } else {
-                this.nextTurn(false);
-            }
+            this.turn = next;
         }
 
-        if (this.shells.length === 0 && this.playerLives > 0 && this.dealerLives > 0) {
-            this.startRound();
-        }
-    }
-
-    nextTurn(hit) {
-        if (this.turn === 'player') {
-            if (this.isHandcuffed.dealer) {
-                this.isHandcuffed.dealer = false;
-                this.onLog("Dealer is handcuffed, player goes again.", "system");
-            } else {
-                this.turn = 'dealer';
-            }
-        } else {
-            if (this.isHandcuffed.player) {
-                this.isHandcuffed.player = false;
-                this.onLog("Player is handcuffed, dealer goes again.", "system");
-            } else {
-                this.turn = 'player';
-            }
-        }
         this.onUpdate();
+        if (this.shells.length === 0) this.loadShells();
     }
 
     checkGameOver() {
-        if (this.playerLives <= 0) {
-            this.onGameOver('dealer');
-        } else if (this.dealerLives <= 0) {
-            this.onGameOver('player');
+        if (this.playerHP <= 0) {
+            this.log("PLAYER DIED.", 'dealer');
+            this.onAction('gameOver', 'dealer');
+            return true;
         }
+        if (this.dealerHP <= 0) {
+            this.log("DEALER DIED.", 'player');
+            this.onAction('gameOver', 'player');
+            return true;
+        }
+        return false;
     }
 }
