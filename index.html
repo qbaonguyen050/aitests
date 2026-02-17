@@ -3,21 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BUCKSHOT ROULETTE 3D</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Zip's Blooket Hacks GUI</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0e0e12;
+            color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+        .container {
+            max-width: 800px;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        h1 {
+            color: #0bc2cf;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        p {
+            font-size: 1.1em;
+            color: #aaa;
+            margin-bottom: 30px;
+        }
+        .bookmarklet-box {
+            background: #1a1a20;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #333;
+            margin-bottom: 30px;
+        }
+        code {
+            display: block;
+            word-break: break-all;
+            color: #9a49aa;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+        .copy-btn {
+            background: #0bc2cf;
+            color: black;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, filter 0.2s;
+        }
+        .copy-btn:hover {
+            transform: scale(1.05);
+            filter: brightness(1.1);
+        }
+        .features {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            text-align: left;
+            margin-top: 40px;
+        }
+        .feature-item {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .feature-item h3 {
+            margin-top: 0;
+            color: #eee;
+            font-size: 1em;
+        }
+        .feature-item p {
+            font-size: 0.9em;
+            margin-bottom: 0;
+        }
+    </style>
 </head>
 <body>
-    <div id="game-container">
-        <canvas id="three-canvas"></canvas>
-        <div id="ui-overlay">
-            <div id="crt-overlay"></div>
-            <div id="interaction-prompt"></div>
+    <div class="container">
+        <h1>Zip's Blooket Hacks</h1>
+        <p>The most advanced, refactored, and sleekest Blooket GUI available.</p>
+
+        <div class="bookmarklet-box">
+            <p style="margin-bottom: 10px; color: #eee; font-weight: bold;">Bookmarklet Code:</p>
+            <code id="bookmarklet-code">javascript:(function(){fetch('https://raw.githubusercontent.com/Zip-On/Zips-Blooket-Hacks-And-Cheats-GUI/main/Gui.js').then(r=>r.text()).then(eval)})()</code>
+            <button class="copy-btn" onclick="copyCode()">Copy to Clipboard</button>
+        </div>
+
+        <div class="features">
+            <div class="feature-item">
+                <h3>🚀 Fast & Modular</h3>
+                <p>Built with modern JS for maximum performance and stability.</p>
+            </div>
+            <div class="feature-item">
+                <h3>🛡️ Anti-Cheat</h3>
+                <p>Blocks report requests to prevent detection by Blooket.</p>
+            </div>
+            <div class="feature-item">
+                <h3>🔍 Searchable</h3>
+                <p>Find exactly what you need among dozens of available cheats.</p>
+            </div>
+            <div class="feature-item">
+                <h3>✨ Sleek UI</h3>
+                <p>Draggable, minimizable, and aesthetically pleasing interface.</p>
+            </div>
         </div>
     </div>
-    <script src="three.min.js"></script>
-    <script src="audio.js"></script>
-    <script src="game.js"></script>
-    <script src="ai.js"></script>
-    <script src="graphics.js"></script>
+
+    <script>
+        function copyCode() {
+            const code = document.getElementById('bookmarklet-code').innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                btn.innerText = 'Copied!';
+                btn.style.background = '#47A547';
+                setTimeout(() => {
+                    btn.innerText = 'Copy to Clipboard';
+                    btn.style.background = '#0bc2cf';
+                }, 2000);
+            });
+        }
+    </script>
 </body>
 </html>
