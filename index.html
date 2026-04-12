@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes">
+    <title>Unity Web Player | Five Night's at BIG E</title>
+    <style>
+      body { padding: 0; margin: 0; background: #1F1F20; overflow: hidden; }
+      #unity-container { position: fixed; width: 100%; height: 100%; }
+      #unity-canvas { width: 100%; height: 100%; background: #1F1F20 }
+      #unity-loading-bar { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: none }
+      #unity-logo { width: 154px; height: 130px; background: url('https://cdn.jsdelivr.net/gh/web-ports/fnae@afd4e5071add297d6169665a4f999d62f312532e/TemplateData/unity-logo-dark.png') no-repeat center }
+      #unity-progress-bar-empty { margin-left: auto; margin-right: auto; width: 141px; height: 18px; margin-top: 10px; background: url('https://cdn.jsdelivr.net/gh/web-ports/fnae@afd4e5071add297d6169665a4f999d62f312532e/TemplateData/progress-bar-empty-dark.png') no-repeat center }
+      #unity-progress-bar-full { width: 0%; height: 18px; margin-top: 10px; background: url('https://cdn.jsdelivr.net/gh/web-ports/fnae@afd4e5071add297d6169665a4f999d62f312532e/TemplateData/progress-bar-full-dark.png') no-repeat center }
+      #unity-warning { position: absolute; left: 50%; top: 5%; transform: translate(-50%); background: white; padding: 10px; display: none }
+      #loading-text {
+        color: white; font-size: 48px; font-family: cursive; text-align: center; margin-top: 20px;
+        font-weight: bold;
+        background: linear-gradient(
+          270deg,
+          #ff0000,
+          #ff7f00,
+          #ffff00,
+          #00ff00,
+          #0000ff,
+          #4b0082,
+          #8f00ff
+        );
+        background-size: 400% 400%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: rainbow 3s ease infinite;
+        position: absolute; width: 100%; top: 10%; z-index: 10;
+      }
+
+      @keyframes rainbow {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+
+      #startup-ui {
+          position: absolute;
+          top: 0; left: 0; width: 100%; height: 100%;
+          background: #1F1F20;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-family: sans-serif;
+          z-index: 20;
+      }
+      #startup-btn {
+          padding: 15px 30px;
+          font-size: 24px;
+          cursor: pointer;
+          background: #444;
+          color: white;
+          border: 2px solid white;
+          border-radius: 8px;
+          margin-top: 20px;
+      }
+      #startup-btn:hover { background: #666; }
+      #download-status {
+          margin-top: 20px;
+          font-size: 18px;
+          text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="startup-ui">
+        <h1>Five Night's at BIG E - Offline Edition</h1>
+        <div id="download-status">Checking local cache...</div>
+        <button id="startup-btn" style="display:none;">Play</button>
+    </div>
+
+    <div id="loading-text" style="display:none;">LOADING...</div>
+    <div id="unity-container" style="display:none;">
+      <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
+      <div id="unity-loading-bar">
+        <div id="unity-logo"></div>
+        <div id="unity-progress-bar-empty">
+          <div id="unity-progress-bar-full"></div>
+        </div>
+      </div>
+      <div id="unity-warning"> </div>
+    </div>
+    <script src="https://unpkg.com/brotli-dec-wasm@1.3.1/index.js"></script>
+    <script>
+      const CDN_BASE = "https://cdn.jsdelivr.net/gh/web-ports/fnae@afd4e5071add297d6169665a4f999d62f312532e/";
+
+      const filesToCache = {
+          "fnae.loader.js": CDN_BASE + "Build/fnae.loader.js",
+          "fnae.framework.js": CDN_BASE + "Build/fnae.framework.js",
+          "fnae.data.part1": CDN_BASE + "Build/fnae.data.part1",
+          "fnae.data.part2": CDN_BASE + "Build/fnae.data.part2",
+          "fnae.data.part3": CDN_BASE + "Build/fnae.data.part3",
+          "fnae.wasm.part1": CDN_BASE + "Build/fnae.wasm.part1",
+          "fnae.wasm.part2": CDN_BASE + "Build/fnae.wasm.part2",
+          "202512191935.webm.part1": CDN_BASE + "StreamingAssets/202512191935.webm.part1",
+          "202512191935.webm.part2": CDN_BASE + "StreamingAssets/202512191935.webm.part2",
+          "202512191935.webm.part3": CDN_BASE + "StreamingAssets/202512191935.webm.part3"
+      };
+
+      const DB_NAME = "FNAEOfflineStorage";
+      const STORE_NAME = "assets";
+      let db;
+
+      function initDB() {
+          return new Promise((resolve, reject) => {
+              const request = indexedDB.open(DB_NAME, 1);
+              request.onupgradeneeded = (e) => {
+                  let db = e.target.result;
+                  if (!db.objectStoreNames.contains(STORE_NAME)) {
+                      db.createObjectStore(STORE_NAME);
+                  }
+              };
+              request.onsuccess = (e) => resolve(e.target.result);
+              request.onerror = (e) => reject(e.target.error);
+          });
+      }
+
+      function getFromDB(key) {
+          return new Promise((resolve, reject) => {
+              const transaction = db.transaction(STORE_NAME, "readonly");
+              const store = transaction.objectStore(STORE_NAME);
+              const request = store.get(key);
+              request.onsuccess = () => resolve(request.result);
+              request.onerror = () => reject(request.error);
+          });
+      }
+
+      function saveToDB(key, data) {
+          return new Promise((resolve, reject) => {
+              const transaction = db.transaction(STORE_NAME, "readwrite");
+              const store = transaction.objectStore(STORE_NAME);
+              const request = store.put(data, key);
+              request.onsuccess = () => resolve();
+              request.onerror = () => reject(request.error);
+          });
+      }
+
+      async function fetchWithProgress(url, onProgress) {
+          const response = await fetch(url);
+          if (!response.ok) throw new Error("Failed to fetch " + url);
+          const reader = response.body.getReader();
+          const contentLength = +response.headers.get('Content-Length');
+          let receivedLength = 0;
+          const chunks = [];
+
+          while(true) {
+              const {done, value} = await reader.read();
+              if (done) break;
+              chunks.push(value);
+              receivedLength += value.length;
+              if(contentLength) {
+                 onProgress(receivedLength, contentLength);
+              }
+          }
+
+          const chunksAll = new Uint8Array(receivedLength);
+          let position = 0;
+          for(let chunk of chunks) {
+              chunksAll.set(chunk, position);
+              position += chunk.length;
+          }
+          return chunksAll;
+      }
+
+      let brotliDecWasmLoaded = false;
+      async function initBrotli() {
+          if (!brotliDecWasmLoaded) {
+             await window.brotliDecWasm();
+             brotliDecWasmLoaded = true;
+          }
+      }
+
+      async function ensureAssets() {
+          db = await initDB();
+          const statusEl = document.getElementById("download-status");
+          const keys = Object.keys(filesToCache);
+          let needsDownload = false;
+
+          for (let key of keys) {
+              const data = await getFromDB(key);
+              if (!data) {
+                  needsDownload = true;
+                  break;
+              }
+          }
+
+          if (needsDownload) {
+              if (!navigator.onLine) {
+                  statusEl.innerHTML = "Offline. Please connect to internet to download game files.";
+                  return false;
+              }
+              statusEl.innerHTML = "Downloading game assets for offline play...<br>Please wait, do not close the page.";
+
+              let totalBytesToDownload = 146000000; // rough estimate 140MB
+              let downloadedBytes = 0;
+
+              for (let key of keys) {
+                  const exists = await getFromDB(key);
+                  if (!exists) {
+                      try {
+                          let lastReceived = 0;
+                          const data = await fetchWithProgress(filesToCache[key], (received, total) => {
+                              let diff = received - lastReceived;
+                              downloadedBytes += diff;
+                              lastReceived = received;
+                              statusEl.innerHTML = `Downloading: ${key}...<br>${(downloadedBytes/1024/1024).toFixed(1)} MB / ~140 MB`;
+                          });
+                          await saveToDB(key, data);
+                      } catch (e) {
+                          statusEl.innerHTML = "Error downloading files. Please refresh and try again.";
+                          console.error(e);
+                          return false;
+                      }
+                  } else {
+                     downloadedBytes += exists.length || exists.byteLength || 0;
+                  }
+              }
+              statusEl.innerHTML = "All files downloaded! Game is ready to play offline.";
+          } else {
+              statusEl.innerHTML = "Game files found locally! Ready to play offline.";
+          }
+
+          document.getElementById("startup-btn").style.display = "block";
+          return true;
+      }
+
+      async function decompressBrotli(uint8Array) {
+          await initBrotli();
+          return window.brotliDecode(uint8Array);
+      }
+
+      async function startGame() {
+          document.getElementById("startup-ui").style.display = "none";
+          document.getElementById("unity-container").style.display = "block";
+          document.getElementById("loading-text").style.display = "block";
+
+          const loadingText = document.getElementById("loading-text");
+          loadingText.textContent = "Extracting & Preparing Assets...";
+
+          // Get data from DB
+          const loaderSrc = new TextDecoder().decode(await getFromDB("fnae.loader.js"));
+          const frameworkSrc = new TextDecoder().decode(await getFromDB("fnae.framework.js"));
+
+          // Merge & Decompress Data
+          loadingText.textContent = "Preparing Data...";
+          const dataParts = [
+              await getFromDB("fnae.data.part1"),
+              await getFromDB("fnae.data.part2"),
+              await getFromDB("fnae.data.part3")
+          ];
+          const decompressedDataParts = [];
+          for(let part of dataParts) decompressedDataParts.push(await decompressBrotli(part));
+          const dataBlob = new Blob(decompressedDataParts, {type: "application/octet-stream"});
+          const dataUrl = URL.createObjectURL(dataBlob);
+
+          // Merge & Decompress Wasm
+          loadingText.textContent = "Preparing WebAssembly...";
+          const wasmParts = [
+              await getFromDB("fnae.wasm.part1"),
+              await getFromDB("fnae.wasm.part2")
+          ];
+          const decompressedWasmParts = [];
+          for(let part of wasmParts) decompressedWasmParts.push(await decompressBrotli(part));
+          const wasmBlob = new Blob(decompressedWasmParts, {type: "application/wasm"});
+          const wasmUrl = URL.createObjectURL(wasmBlob);
+
+          // Merge WebM (not brotli)
+          // Wait, actually the original code uses fetchAndDecompressBrotli for webm parts too! Let me check the original code again.
+          // Yes: mergeFiles(getParts("StreamingAssets/202512191935.webm", 1, 3), "202512191935.webm")
+          loadingText.textContent = "Preparing Video...";
+          const webmParts = [
+              await getFromDB("202512191935.webm.part1"),
+              await getFromDB("202512191935.webm.part2"),
+              await getFromDB("202512191935.webm.part3")
+          ];
+          const decompressedWebmParts = [];
+          for(let part of webmParts) decompressedWebmParts.push(await decompressBrotli(part));
+          const webmBlob = new Blob(decompressedWebmParts, {type: "video/webm"});
+          window.randomwebm = URL.createObjectURL(webmBlob);
+
+          // Overwrite Fetch & XHR for WebM
+          const originalFetch = window.fetch;
+          window.fetch = async function(input, init) {
+              let urlString = (input instanceof Request) ? input.url : String(input);
+              if (urlString.includes("202512191935.webm")) {
+                  input = (input instanceof Request) ? new Request(window.randomwebm, input) : window.randomwebm;
+              }
+              // Intercept framework request
+              if (urlString.includes("fnae.framework.js")) {
+                  return new Response(frameworkSrc, { headers: { 'Content-Type': 'application/javascript' } });
+              }
+              return originalFetch(input, init);
+          };
+
+          const originalOpen = XMLHttpRequest.prototype.open;
+          XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+              if (url.includes("202512191935.webm")) url = window.randomwebm;
+              return originalOpen.call(this, method, url, ...rest);
+          };
+
+          // Configure Unity
+          var container = document.querySelector("#unity-container");
+          var canvas = document.querySelector("#unity-canvas");
+          var loadingBar = document.querySelector("#unity-loading-bar");
+          var progressBarFull = document.querySelector("#unity-progress-bar-full");
+          var warningBanner = document.querySelector("#unity-warning");
+
+          function unityShowBanner(msg, type) {
+            function updateBannerVisibility() {
+              warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+            }
+            var div = document.createElement('div');
+            div.innerHTML = msg;
+            warningBanner.appendChild(div);
+            if (type == 'error') div.style = 'background: red; padding: 10px;';
+            else {
+              if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
+              setTimeout(function() {
+                warningBanner.removeChild(div);
+                updateBannerVisibility();
+              }, 5000);
+            }
+            updateBannerVisibility();
+          }
+
+          // In unity loader, it fetches fnae.framework.js, we intercepted that in fetch!
+          // We can just use dummy URL for frameworkUrl since we mock fetch for it.
+          var config = {
+            arguments: [],
+            dataUrl: dataUrl,
+            frameworkUrl: "Build/fnae.framework.js", // Will be intercepted
+            codeUrl: wasmUrl,
+            streamingAssetsUrl: "StreamingAssets",
+            companyName: "DefaultCompany",
+            productName: "fnae",
+            productVersion: "1.0",
+            showBanner: unityShowBanner,
+          };
+
+          loadingBar.style.display = "block";
+
+          // Inject loader script
+          loadingText.textContent = "Starting Engine...";
+          var script = document.createElement("script");
+          const loaderBlob = new Blob([loaderSrc], {type: "application/javascript"});
+          script.src = URL.createObjectURL(loaderBlob);
+          script.onload = () => {
+            createUnityInstance(canvas, config, (progress) => {
+              progressBarFull.style.width = 100 * progress + "%";
+            }).then((unityInstance) => {
+              loadingBar.style.display = "none";
+              loadingText.style.display = "none";
+            }).catch((message) => {
+              alert(message);
+            });
+          };
+          document.body.appendChild(script);
+      }
+
+      window.onload = () => {
+          ensureAssets();
+          document.getElementById("startup-btn").addEventListener("click", startGame);
+      };
+    </script>
+  </body>
+</html>
