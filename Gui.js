@@ -557,22 +557,49 @@ console.log = function(...args) {
             data: null,
             run: function() {
                 this.enabled ? (this.enabled = !1, clearInterval(this.data), this.data = null) : (this.enabled = !0, this.data = setInterval(() => {
-                    var {
-                        state: {
-                            question: e,
-                            stage: t,
-                            feedback: a
-                        },
-                        props: {
-                            client: {
-                                question: o
-                            }
-                        }
-                    } = window.getBlooketReactOwner().stateNode;
+                    var owner = window.getBlooketReactOwner();
+                    if (!owner || !owner.stateNode) {
+                        console.log("Auto Answer: Could not find React owner.");
+                        return;
+                    }
+                    var node = owner.stateNode;
+                    var state = node.state || {};
+                    var props = node.props || {};
+                    var client = props.client || {};
+                    var e = state.question;
+                    var t = state.stage;
+                    var a = state.feedback;
+                    var o = client.question;
                     let r = e || o;
+
+                    if (!r) {
+                        console.log("Auto Answer: Waiting for question...");
+                        return;
+                    }
+
                     try {
-                        "typing" != r.qType ? ("feedback" === t || a ? document.querySelector('[class*="feedback"]')?.firstChild : [...document.querySelectorAll('[class*="answerContainer"]')][r.answers.map((e, t) => r.correctAnswers.includes(e) ? t : null).filter(e => null != e)[0]])?.click?.() : window.getBlooketReactOwner().stateNode.sendAnswer(r.answers[0])
-                    } catch {}
+                        if ("typing" != r.qType) {
+                            if ("feedback" === t || a) {
+                                let f = document.querySelector('[class*="feedback"]');
+                                if (f && f.firstChild) {
+                                    console.log("Auto Answer: Clicking next...");
+                                    f.firstChild.click();
+                                }
+                            } else {
+                                let answers = [...document.querySelectorAll('[class*="answerContainer"]')];
+                                let correctIdx = r.answers.findIndex(ans => r.correctAnswers.includes(ans));
+                                if (correctIdx !== -1 && answers[correctIdx]) {
+                                    console.log("Auto Answer: Clicking correct answer - " + r.correctAnswers[0]);
+                                    answers[correctIdx].click();
+                                }
+                            }
+                        } else {
+                            console.log("Auto Answer: Sending typing answer - " + r.answers[0]);
+                            node.sendAnswer(r.answers[0]);
+                        }
+                    } catch (err) {
+                        console.log("Auto Answer Error: " + err.message);
+                    }
                 }, 50))
             }
         }, {
@@ -1328,21 +1355,49 @@ console.log = function(...args) {
             name: "Auto Answer",
             description: "Click the correct answer for you",
             run: function() {
-                let {
-                    state: {
-                        question: e,
-                        stage: t,
-                        feedback: a
-                    },
-                    props: {
-                        client: {
-                            question: o
-                        }
-                    }
-                } = window.getBlooketReactOwner().stateNode;
+                var owner = window.getBlooketReactOwner();
+                if (!owner || !owner.stateNode) {
+                    console.log("Auto Answer: Could not find React owner.");
+                    return;
+                }
+                var node = owner.stateNode;
+                var state = node.state || {};
+                var props = node.props || {};
+                var client = props.client || {};
+                var e = state.question;
+                var t = state.stage;
+                var a = state.feedback;
+                var o = client.question;
+                let r = e || o;
+
+                if (!r) {
+                    console.log("Auto Answer: Waiting for question...");
+                    return;
+                }
+
                 try {
-                    "typing" != e.qType ? ("feedback" === t || a ? document.querySelector('[class*="feedback"]')?.firstChild : [...document.querySelectorAll('[class*="answerContainer"]')][(e || o).answers.map((t, a) => (e || o).correctAnswers.includes(t) ? a : null).filter(e => null != e)[0]])?.click?.() : window.getBlooketReactOwner().stateNode.sendAnswer(e.answers[0])
-                } catch {}
+                    if ("typing" != r.qType) {
+                        if ("feedback" === t || a) {
+                            let f = document.querySelector('[class*="feedback"]');
+                            if (f && f.firstChild) {
+                                console.log("Auto Answer: Clicking next...");
+                                f.firstChild.click();
+                            }
+                        } else {
+                            let answers = [...document.querySelectorAll('[class*="answerContainer"]')];
+                            let correctIdx = r.answers.findIndex(ans => r.correctAnswers.includes(ans));
+                            if (correctIdx !== -1 && answers[correctIdx]) {
+                                console.log("Auto Answer: Clicking correct answer - " + r.correctAnswers[0]);
+                                answers[correctIdx].click();
+                            }
+                        }
+                    } else {
+                        console.log("Auto Answer: Sending typing answer - " + r.answers[0]);
+                        node.sendAnswer(r.answers[0]);
+                    }
+                } catch (err) {
+                    console.log("Auto Answer Error: " + err.message);
+                }
             }
         }, {
             name: "Highlight Answers",
