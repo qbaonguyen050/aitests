@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global ICBM Simulator</title>
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --text-color: #00ff00;
+            --accent-color: #00cc00;
+            --danger-color: #ff0000;
+            --font-main: 'Courier New', Courier, monospace;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-main);
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #app {
+            width: 90vw;
+            height: 90vh;
+            border: 2px solid var(--accent-color);
+            padding: 20px;
+            box-sizing: border-box;
+            position: relative;
+            background: linear-gradient(180deg, #111 0%, #050505 100%);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+        }
+
+        .screen {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        h1, h2 {
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-bottom: 20px;
+        }
+
+        .crt-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 118, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        button {
+            background: transparent;
+            color: var(--text-color);
+            border: 1px solid var(--text-color);
+            padding: 10px 20px;
+            cursor: pointer;
+            font-family: var(--font-main);
+            text-transform: uppercase;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: var(--text-color);
+            color: var(--bg-color);
+        }
+
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        /* Control Panel Styles */
+        .panel-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            height: 100%;
+        }
+
+        .status-display {
+            border: 1px solid var(--accent-color);
+            padding: 15px;
+            background: rgba(0, 50, 0, 0.3);
+            font-size: 0.9em;
+        }
+
+        #telemetry-panel {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 200px;
+            background: rgba(0,0,0,0.8);
+            border: 1px solid var(--accent-color);
+            padding: 10px;
+            font-size: 0.7em;
+            display: none;
+            z-index: 10;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .keypad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 200px;
+            margin: 0 auto;
+        }
+
+        .keypad button {
+            padding: 15px;
+            font-weight: bold;
+        }
+
+        .switch-group {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            border: 1px dashed var(--accent-color);
+            padding: 20px;
+        }
+
+        .indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #333;
+            box-shadow: inset 0 0 5px #000;
+        }
+
+        .indicator.on {
+            background: #0f0;
+            box-shadow: 0 0 10px #0f0;
+        }
+
+        .indicator.error {
+            background: #f00;
+            box-shadow: 0 0 10px #f00;
+        }
+
+        .big-red-button {
+            width: 100px;
+            height: 100px;
+            background: radial-gradient(#f00, #900);
+            border-radius: 50%;
+            border: 5px solid #500;
+            cursor: pointer;
+            margin: 0 auto;
+            box-shadow: 0 10px 0 #300;
+            transition: all 0.1s;
+        }
+
+        .big-red-button:active {
+            transform: translateY(5px);
+            box-shadow: 0 5px 0 #300;
+        }
+
+        .dual-keys {
+            display: flex;
+            gap: 50px;
+            justify-content: center;
+        }
+
+        .key-slot {
+            width: 60px;
+            height: 60px;
+            border: 2px solid #666;
+            background: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .key-slot.turned {
+            transform: rotate(90deg);
+            border-color: var(--text-color);
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="crt-overlay"></div>
+        <div id="main-menu" class="screen active">
+            <h1>Global ICBM Simulator</h1>
+            <p style="text-align: center;">SELECT NATION OF ORIGIN</p>
+            <div id="country-list" class="menu-grid">
+                <!-- Countries will be injected here -->
+            </div>
+        </div>
+
+        <div id="missile-menu" class="screen">
+            <h1 id="selected-country-name">COUNTRY</h1>
+            <p style="text-align: center;">SELECT WEAPON SYSTEM</p>
+            <div id="missile-list" class="menu-grid">
+                <!-- Missiles will be injected here -->
+            </div>
+            <button onclick="resetToMenu()" style="margin-top: 20px;">BACK TO MAIN MENU</button>
+        </div>
+
+        <div id="simulator" class="screen">
+            <div id="control-panel">
+                <!-- Specific controls will be injected here -->
+            </div>
+        </div>
+
+        <div id="launch-screen" class="screen">
+            <h1 id="launch-status">MISSILE AWAY</h1>
+            <div id="telemetry-panel">
+                <p>ALTITUDE: <span id="tel-alt">0</span> km</p>
+                <p>VELOCITY: <span id="tel-vel">0</span> km/s</p>
+                <p>COORD X: <span id="tel-x">0</span></p>
+                <p>COORD Y: <span id="tel-y">0</span></p>
+                <p>ETA: <span id="tel-eta">0</span>s</p>
+            </div>
+            <div id="animation-container" style="flex: 1; position: relative; overflow: hidden; background: #000; border: 1px solid #333;">
+                <svg id="missile-svg" viewBox="0 0 200 100" style="width: 100%; height: 100%;">
+                    <!-- World Map Background (Simplified) -->
+                    <rect width="200" height="100" fill="#000510" />
+                    <!-- Detailed World Map (Simplified Paths) -->
+                    <g fill="#112233" stroke="#1a334d" stroke-width="0.2">
+                        <!-- North America -->
+                        <path d="M25,15 L45,15 L60,25 L65,40 L55,50 L40,55 L25,50 L15,35 Z" />
+                        <!-- South America -->
+                        <path d="M50,55 L65,60 L60,90 L45,75 L40,65 Z" />
+                        <!-- Eurasia -->
+                        <path d="M80,10 L120,5 L170,10 L185,25 L180,45 L150,55 L130,50 L110,45 L90,35 L85,20 Z" />
+                        <!-- Africa -->
+                        <path d="M85,38 L110,40 L120,55 L115,80 L100,85 L85,75 L80,55 Z" />
+                        <!-- Australia -->
+                        <path d="M160,75 L180,75 L185,85 L175,95 L160,90 Z" />
+                        <!-- Greenland -->
+                        <path d="M55,5 L70,5 L75,15 L60,15 Z" />
+                    </g>
+
+                    <g id="map-markers"></g>
+                    <g id="map-trajectories"></g>
+                </svg>
+            </div>
+            <div id="impact-info" style="text-align: center; padding: 20px; font-size: 1.2em; min-height: 3em;"></div>
+            <button onclick="resetToMenu()">RESET SIMULATOR</button>
+        </div>
+    </div>
+
+    <script>
+        // Audio Synthesis
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            switch(type) {
+                case 'beep':
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(880, now);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                    break;
+                case 'click':
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(150, now);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                    break;
+                case 'alarm':
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.linearRampToValueAtTime(880, now + 0.5);
+                    osc.frequency.linearRampToValueAtTime(440, now + 1.0);
+                    gain.gain.setValueAtTime(0.05, now);
+                    gain.gain.linearRampToValueAtTime(0.05, now + 1.0);
+                    gain.gain.linearRampToValueAtTime(0, now + 1.1);
+                    osc.start(now);
+                    osc.stop(now + 1.1);
+                    break;
+                case 'launch':
+                    // White noise simulation for launch
+                    const bufferSize = audioCtx.sampleRate * 2;
+                    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                    const output = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        output[i] = Math.random() * 2 - 1;
+                    }
+                    const whiteNoise = audioCtx.createBufferSource();
+                    whiteNoise.buffer = buffer;
+                    const lowpass = audioCtx.createBiquadFilter();
+                    lowpass.type = 'lowpass';
+                    lowpass.frequency.setValueAtTime(400, now);
+                    lowpass.frequency.exponentialRampToValueAtTime(100, now + 2);
+                    whiteNoise.connect(lowpass);
+                    const nGain = audioCtx.createGain();
+                    nGain.gain.setValueAtTime(0.3, now);
+                    nGain.gain.exponentialRampToValueAtTime(0.01, now + 2);
+                    lowpass.connect(nGain);
+                    nGain.connect(audioCtx.destination);
+                    whiteNoise.start(now);
+                    break;
+            }
+        }
+
+        const nations = {
+            usa: {
+                name: "United States of America",
+                color: "#4a90e2",
+                controlType: "LCC_US",
+                coords: { x: 40, y: 40 },
+                defense: 0.85,
+                missiles: [
+                    { id: "minuteman", name: "LGM-30G Minuteman III", type: "Silo-based ICBM", speed: 24100 },
+                    { id: "trident", name: "UGM-133 Trident II (D5)", type: "SLBM", speed: 29000 }
+                ]
+            },
+            russia: {
+                name: "Russian Federation",
+                color: "#e30022",
+                controlType: "SOVIET_RU",
+                coords: { x: 120, y: 25 },
+                defense: 0.80,
+                missiles: [
+                    { id: "yars", name: "RS-24 Yars", type: "Mobile/Silo ICBM", speed: 24500 },
+                    { id: "sarmat", name: "RS-28 Sarmat", type: "Heavy ICBM", speed: 25500 }
+                ]
+            },
+            china: {
+                name: "China",
+                color: "#ffde00",
+                controlType: "MODERN_CN",
+                coords: { x: 150, y: 40 },
+                defense: 0.75,
+                missiles: [
+                    { id: "df41", name: "DF-41", type: "Road-mobile ICBM", speed: 30000 },
+                    { id: "df31", name: "DF-31AG", type: "Mobile ICBM", speed: 28000 }
+                ]
+            },
+            north_korea: {
+                name: "DPRK (North Korea)",
+                color: "#ed1c24",
+                controlType: "RUGGED_NK",
+                coords: { x: 165, y: 40 },
+                defense: 0.30,
+                missiles: [
+                    { id: "hwasong17", name: "Hwasong-17", type: "Mobile Heavy ICBM", speed: 22000 },
+                    { id: "hwasong18", name: "Hwasong-18", type: "Solid-fuel ICBM", speed: 24000 }
+                ]
+            },
+            uk: {
+                name: "United Kingdom",
+                color: "#00247d",
+                controlType: "RN_UK",
+                coords: { x: 90, y: 30 },
+                defense: 0.70,
+                missiles: [
+                    { id: "trident_uk", name: "Trident II (D5)", type: "SLBM (Vanguard-class)", speed: 29000 }
+                ]
+            },
+            france: {
+                name: "France",
+                color: "#00209f",
+                controlType: "EU_FR",
+                coords: { x: 92, y: 35 },
+                defense: 0.70,
+                missiles: [
+                    { id: "m51", name: "M51", type: "SLBM (Triomphant-class)", speed: 30000 }
+                ]
+            },
+            india: {
+                name: "India",
+                color: "#ff9933",
+                controlType: "ISRO_IN",
+                coords: { x: 135, y: 55 },
+                defense: 0.60,
+                missiles: [
+                    { id: "agni5", name: "Agni-V", type: "Road-mobile ICBM", speed: 29400 }
+                ]
+            },
+            pakistan: {
+                name: "Pakistan",
+                color: "#006600",
+                controlType: "PA_PK",
+                coords: { x: 130, y: 50 },
+                defense: 0.50,
+                missiles: [
+                    { id: "shaheen3", name: "Shaheen-III", type: "MRBM", speed: 22000 }
+                ]
+            },
+            israel: {
+                name: "Israel",
+                color: "#0038b8",
+                controlType: "IDF_IL",
+                coords: { x: 105, y: 45 },
+                defense: 0.90,
+                missiles: [
+                    { id: "jericho3", name: "Jericho III", type: "ICBM", speed: 25000 }
+                ]
+            }
+        };
+
+        let currentTimer = null;
+        let currentState = {
+            nation: null,
+            missile: null,
+            targetNation: null,
+            step: 'idle',
+            pal: '',
+            keys: { 1: false, 2: false },
+            isArmed: false,
+            isBioScanning: false,
+            bioProgress: 0,
+            targetSet: false
+        };
+
+        function resetSequence() {
+            if (currentTimer) clearInterval(currentTimer);
+            currentState.pal = '';
+            currentState.keys = { 1: false, 2: false };
+            currentState.isArmed = false;
+            currentState.isBioScanning = false;
+            currentState.bioProgress = 0;
+            currentState.targetSet = false;
+        }
+
+        function updateLog(msg) {
+            const log = document.getElementById('log');
+            if (log) {
+                log.innerHTML += `[${new Date().toLocaleTimeString()}] ${msg}<br>`;
+                log.scrollTop = log.scrollHeight;
+            }
+        }
+
+        // USA Logic
+        function inputPAL(n) {
+            playSound('beep');
+            if (currentState.pal.length < 6) {
+                currentState.pal += n;
+                document.getElementById('pal-display').innerText = currentState.pal.padEnd(6, '-');
+            }
+        }
+
+        function clearPAL() {
+            currentState.pal = '';
+            document.getElementById('pal-display').innerText = '------';
+        }
+
+        function verifyPAL() {
+            if (currentState.pal.length === 6) {
+                updateLog("PAL AUTHENTICATED. KEYS ENABLED.");
+                document.getElementById('pal-display').style.color = '#0f0';
+            } else {
+                updateLog("INVALID PAL LENGTH.");
+            }
+        }
+
+        function turnKey(n) {
+            playSound('click');
+            if (currentState.pal.length !== 6) {
+                updateLog("PAL AUTHORIZATION REQUIRED FIRST.");
+                return;
+            }
+            currentState.keys[n] = !currentState.keys[n];
+            document.getElementById(`key-${n}`).classList.toggle('turned');
+            if (currentState.keys[1] && currentState.keys[2]) {
+                updateLog("DUAL KEYS TURNED. SYSTEM ARMED.");
+                document.getElementById('launch-btn').disabled = false;
+            } else {
+                document.getElementById('launch-btn').disabled = true;
+            }
+        }
+
+        // Russia Logic
+        function verifyRUCode() {
+            playSound('beep');
+            const code = document.getElementById('ru-code').value;
+            if (code) {
+                updateLog("КОД ПОДТВЕРЖДЕН. СИСТЕМА ГОТОВА.");
+                updateLog("CODE VERIFIED. SYSTEM READY.");
+            }
+        }
+
+        function toggleArm() {
+            playSound('click');
+            currentState.isArmed = !currentState.isArmed;
+            document.getElementById('arm-ind').classList.toggle('on');
+            updateLog(currentState.isArmed ? "SYSTEM ARMED." : "SYSTEM DISARMED.");
+        }
+
+        // China Logic
+        let bioInterval;
+        function startBiometric() {
+            currentState.isBioScanning = true;
+            bioInterval = setInterval(() => {
+                if (currentState.bioProgress < 100) {
+                    currentState.bioProgress += 5;
+                    document.getElementById('bio-bar').style.width = currentState.bioProgress + '%';
+                } else {
+                    clearInterval(bioInterval);
+                    updateLog("BIOMETRICS VERIFIED.");
+                    checkChinaReady();
+                }
+            }, 100);
+        }
+
+        function stopBiometric() {
+            currentState.isBioScanning = false;
+            clearInterval(bioInterval);
+            if (currentState.bioProgress < 100) {
+                currentState.bioProgress = 0;
+                document.getElementById('bio-bar').style.width = '0%';
+            }
+        }
+
+        function setTarget(targetId) {
+            playSound('beep');
+            const targetNation = nations[targetId];
+            currentState.targetNation = targetId;
+            currentState.targetSet = true;
+            updateLog(`TARGET ACQUIRED: ${targetNation.name.toUpperCase()}.`);
+
+            if (currentState.nation === 'china') checkChinaReady();
+            if (currentState.nation === 'usa') {
+                // If PAL and targeting are both done, keys are already checked in turnKey
+                if (currentState.keys[1] && currentState.keys[2]) {
+                    document.getElementById('launch-btn').disabled = false;
+                }
+            }
+        }
+
+        function checkChinaReady() {
+            if (currentState.bioProgress >= 100 && currentState.targetSet) {
+                document.getElementById('launch-btn-cn').disabled = false;
+            }
+        }
+
+        // NK Logic
+        function verifyNK() {
+            playSound('beep');
+            updateLog("SUPREME LEADER AUTHORIZATION RECEIVED.");
+            updateLog("GLORY TO THE DPRK.");
+        }
+
+        function initiateLaunch() {
+            if (!currentState.targetSet) {
+                updateLog("ERROR: NO TARGET SELECTED.");
+                playSound('beep');
+                return;
+            }
+            playSound('alarm');
+            updateLog("LAUNCH INITIATED!");
+            let countdown = 5;
+            currentTimer = setInterval(() => {
+                if (countdown > 0) {
+                    playSound('beep');
+                    updateLog(`T-MINUS ${countdown}...`);
+                    countdown--;
+                } else {
+                    clearInterval(currentTimer);
+                    executeLaunch();
+                }
+            }, 1000);
+        }
+
+        function executeLaunch() {
+            playSound('launch');
+            showScreen('launch-screen');
+            startLaunchAnimation();
+        }
+
+        function startLaunchAnimation() {
+            const markers = document.getElementById('map-markers');
+            const trajectories = document.getElementById('map-trajectories');
+            const info = document.getElementById('impact-info');
+            const telPanel = document.getElementById('telemetry-panel');
+            telPanel.style.display = 'block';
+
+            markers.innerHTML = '';
+            trajectories.innerHTML = '';
+            info.innerText = 'MISSILE EN ROUTE...';
+            info.style.color = 'var(--text-color)';
+
+            const src = nations[currentState.nation];
+            const dst = nations[currentState.targetNation];
+            const missileData = currentState.missile;
+
+            // Draw Markers
+            markers.innerHTML += `<circle cx="${src.coords.x}" cy="${src.coords.y}" r="2" fill="${src.color}" />`;
+            markers.innerHTML += `<circle cx="${dst.coords.x}" cy="${dst.coords.y}" r="2" fill="${dst.color}" />`;
+
+            // Calculate Path
+            const dx = dst.coords.x - src.coords.x;
+            const dy = dst.coords.y - src.coords.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            const midX = (src.coords.x + dst.coords.x) / 2;
+            const midY = Math.min(src.coords.y, dst.coords.y) - (dist * 0.4);
+
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            const d = `M ${src.coords.x} ${src.coords.y} Q ${midX} ${midY} ${dst.coords.x} ${dst.coords.y}`;
+            path.setAttribute("d", d);
+            path.setAttribute("fill", "none");
+            path.setAttribute("stroke", "rgba(255,255,255,0.2)");
+            path.setAttribute("stroke-width", "0.5");
+            path.setAttribute("stroke-dasharray", "2,2");
+            trajectories.appendChild(path);
+
+            const missileMarker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            missileMarker.setAttribute("r", "1.2");
+            missileMarker.setAttribute("fill", "red");
+            trajectories.appendChild(missileMarker);
+
+            const totalLength = path.getTotalLength();
+
+            // Duration calculation
+            const realDistKm = dist * 100;
+            const speedKmS = (missileData.speed / 3600);
+            const totalFlightSeconds = realDistKm / speedKmS;
+            const uxDurationMs = Math.max(8000, realDistKm / (missileData.speed / 400));
+
+            let defenseLaunchedCount = 0;
+            const maxDefenseAttempts = 3;
+            let isIntercepted = false;
+            const startTime = performance.now();
+
+            function updateTelemetry(prog, x, y) {
+                const elapsedSec = (performance.now() - startTime) / 1000;
+                const remSec = (uxDurationMs / 1000) - elapsedSec;
+                const maxAlt = realDistKm * 0.25;
+                const curAlt = 4 * maxAlt * prog * (1 - prog);
+
+                document.getElementById("tel-alt").innerText = Math.round(curAlt);
+                document.getElementById("tel-vel").innerText = (missileData.speed / 3600).toFixed(2);
+                document.getElementById("tel-x").innerText = x.toFixed(2);
+                document.getElementById("tel-y").innerText = y.toFixed(2);
+                document.getElementById("tel-eta").innerText = Math.max(0, Math.round(remSec));
+            }
+
+            function animate(now) {
+                if (isIntercepted) return;
+
+                const elapsed = now - startTime;
+                const progress = Math.min(elapsed / uxDurationMs, 1);
+
+                const point = path.getPointAtLength(progress * totalLength);
+                missileMarker.setAttribute("cx", point.x);
+                missileMarker.setAttribute("cy", point.y);
+
+                updateTelemetry(progress, point.x, point.y);
+
+                // Visual terminal zone
+                if (progress > 0.8 && !document.getElementById('terminal-zone')) {
+                    info.innerText = "WARNING: MISSILE ENTERING TERMINAL PHASE";
+                    info.style.color = "orange";
+                    const zone = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    zone.setAttribute("id", "terminal-zone");
+                    zone.setAttribute("cx", dst.coords.x);
+                    zone.setAttribute("cy", dst.coords.y);
+                    zone.setAttribute("r", "5");
+                    zone.setAttribute("fill", "none");
+                    zone.setAttribute("stroke", "red");
+                    zone.setAttribute("stroke-width", "0.2");
+                    zone.setAttribute("stroke-dasharray", "1,1");
+                    trajectories.appendChild(zone);
+                }
+
+                // Defense logic: Intercept at stages
+                if (progress > 0.3 && defenseLaunchedCount === 0) {
+                    defenseLaunchedCount = 1;
+                    attemptInterception(dst, point, trajectories, (success) => handleInterception(success, "MID-COURSE (SM-3)"));
+                } else if (progress > 0.6 && defenseLaunchedCount === 1) {
+                    defenseLaunchedCount = 2;
+                    attemptInterception(dst, point, trajectories, (success) => handleInterception(success, "MID-COURSE (GBI)"));
+                } else if (progress > 0.85 && defenseLaunchedCount === 2) {
+                    defenseLaunchedCount = 3;
+                    // Terminal phase: Faster interceptor, higher success, but very late
+                    attemptInterception(dst, point, trajectories, (success) => handleInterception(success, "TERMINAL (THAAD/S-400)"), 400);
+                }
+
+                if (progress < 1 && !isIntercepted) {
+                    requestAnimationFrame(animate);
+                } else if (progress >= 1 && !isIntercepted) {
+                    impact(dst);
+                }
+            }
+
+            function handleInterception(success, phase) {
+                if (success && !isIntercepted) {
+                    isIntercepted = true;
+                    info.innerText = `[ALERT] MISSILE INTERCEPTED BY ${dst.name.toUpperCase()} - ${phase}`;
+                    info.style.color = 'yellow';
+                    playSound('alarm');
+                    // Explosion at current position
+                    const dot = missileMarker;
+                    trajectories.innerHTML += `<circle cx="${dot.getAttribute('cx')}" cy="${dot.getAttribute('cy')}" r="5" fill="orange" opacity="0.8">
+                        <animate attributeName="r" from="0" to="10" dur="0.5s" fill="freeze" />
+                        <animate attributeName="opacity" from="0.8" to="0" dur="0.5s" fill="freeze" />
+                    </circle>`;
+                    setTimeout(() => resetToMenu(), 4000);
+                } else if (!isIntercepted) {
+                    info.innerText = `[DEFENSE] ${dst.name} ${phase} attempt FAILED.`;
+                }
+            }
+
+            function impact(target) {
+                info.innerText = "IMPACT CONFIRMED. TARGET DESTROYED.";
+                info.style.color = '#ff0000';
+                playSound('launch'); // Explosion sound
+                trajectories.innerHTML += `<circle cx="${target.coords.x}" cy="${target.coords.y}" r="10" fill="red" opacity="0.6">
+                    <animate attributeName="r" from="0" to="20" dur="1s" fill="freeze" />
+                    <animate attributeName="opacity" from="0.6" to="0" dur="1s" fill="freeze" />
+                </circle>`;
+                setTimeout(() => resetToMenu(), 4000);
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        function attemptInterception(defender, targetPoint, svg, callback, customDuration = 1000) {
+            const startX = defender.coords.x;
+            const startY = defender.coords.y;
+
+            const interceptor = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            interceptor.setAttribute("x1", startX);
+            interceptor.setAttribute("y1", startY);
+            interceptor.setAttribute("x2", startX);
+            interceptor.setAttribute("y2", startY);
+            interceptor.setAttribute("stroke", "cyan");
+            interceptor.setAttribute("stroke-width", "0.5");
+            svg.appendChild(interceptor);
+
+            let iStartTime = performance.now();
+            const iDuration = customDuration;
+
+            function animateInterceptor(now) {
+                const elapsed = now - iStartTime;
+                const progress = Math.min(elapsed / iDuration, 1);
+
+                const curX = startX + (targetPoint.x - startX) * progress;
+                const curY = startY + (targetPoint.y - startY) * progress;
+
+                interceptor.setAttribute("x2", curX);
+                interceptor.setAttribute("y2", curY);
+
+                if (progress < 1) {
+                    requestAnimationFrame(animateInterceptor);
+                } else {
+                    // Success chance modified by defender rating and missile speed
+                    // Faster missiles are harder to intercept
+                    const missileSpeed = nations[currentState.nation].missiles.find(m => m.id === currentState.missile.id).speed;
+                    const speedFactor = 25000 / missileSpeed;
+                    // Terminal phase (shorter duration) has higher success chance but less time
+                    const phaseBonus = (customDuration < 500) ? 1.5 : 1.0;
+                    const success = Math.random() < (defender.defense * 0.35 * speedFactor * phaseBonus);
+                    if (success) {
+                        interceptor.setAttribute("stroke", "white");
+                        callback(true);
+                    } else {
+                        interceptor.remove();
+                        callback(false);
+                    }
+                }
+            }
+            requestAnimationFrame(animateInterceptor);
+        }
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function resetToMenu() {
+            resetSequence();
+            document.getElementById('telemetry-panel').style.display = 'none';
+            showScreen('main-menu');
+        }
+
+        function init() {
+            const countryList = document.getElementById('country-list');
+            for (const key in nations) {
+                const nation = nations[key];
+                const btn = document.createElement('button');
+                btn.innerHTML = `<strong>${nation.name}</strong><br><small>${nation.missiles.length} WEAPON SYSTEMS</small>`;
+                btn.style.borderColor = nation.color;
+                btn.onclick = () => selectNation(key);
+                countryList.appendChild(btn);
+            }
+        }
+
+        function selectNation(key) {
+            currentState.nation = key;
+            const nation = nations[key];
+            document.getElementById('selected-country-name').innerText = nation.name;
+            const missileList = document.getElementById('missile-list');
+            missileList.innerHTML = '';
+
+            nation.missiles.forEach(m => {
+                const btn = document.createElement('button');
+                btn.innerHTML = `<strong>${m.name}</strong><br><small>${m.type}</small>`;
+                btn.onclick = () => selectMissile(m.id);
+                missileList.appendChild(btn);
+            });
+
+            showScreen('missile-menu');
+        }
+
+        function selectMissile(missileId) {
+            const nation = nations[currentState.nation];
+            currentState.missile = nation.missiles.find(m => m.id === missileId);
+            startSimulator();
+        }
+
+        function startSimulator() {
+            showScreen('simulator');
+            renderControlPanel();
+        }
+
+        function renderControlPanel() {
+            const panel = document.getElementById('control-panel');
+            const nation = nations[currentState.nation];
+
+            let targetOptions = Object.keys(nations)
+                .filter(k => k !== currentState.nation)
+                .map(k => `<option value="${k}">${nations[k].name}</option>`)
+                .join('');
+
+            let controlHTML = `
+                <div class="panel-container">
+                    <div class="status-display" id="status-display">
+                        <h2>${currentState.missile.name}</h2>
+                        <p>NATION: ${nation.name}</p>
+                        <p>STATUS: STANDBY</p>
+                        <hr>
+                        <div style="margin-bottom: 10px;">
+                            <label>SELECT TARGET NATION:</label><br>
+                            <select id="target-selector" onchange="setTarget(this.value)" style="background: #000; color: #0f0; border: 1px solid #0f0; width: 100%;">
+                                <option value="">-- SELECT TARGET --</option>
+                                ${targetOptions}
+                            </select>
+                        </div>
+                        <hr>
+                        <div id="log" style="height: 150px; overflow-y: auto; font-size: 0.8em; color: #88ff88;">
+                            [SYSTEM] Initializing command link...<br>
+                            [SYSTEM] Secure connection established.<br>
+                        </div>
+                    </div>
+                    <div class="controls" id="controls-area">
+                        ${getControlsForType(nation.controlType)}
+                    </div>
+                </div>
+            `;
+
+            panel.innerHTML = controlHTML;
+            resetSequence();
+        }
+
+        function getControlsForType(type) {
+            switch(type) {
+                case 'LCC_US':
+                    return `
+                        <h3>PAL AUTHORIZATION</h3>
+                        <div id="pal-display" style="text-align:center; font-size: 1.5em; border: 1px solid #333; margin-bottom: 10px;">------</div>
+                        <div class="keypad">
+                            ${[1,2,3,4,5,6,7,8,9].map(n => `<button onclick="inputPAL(${n})">${n}</button>`).join('')}
+                            <button onclick="clearPAL()">CLR</button>
+                            <button onclick="inputPAL(0)">0</button>
+                            <button onclick="verifyPAL()">ENT</button>
+                        </div>
+                        <hr>
+                        <h3>DUAL KEY TURN</h3>
+                        <div class="dual-keys">
+                            <div class="key-slot" id="key-1" onclick="turnKey(1)">🔑</div>
+                            <div class="key-slot" id="key-2" onclick="turnKey(2)">🔑</div>
+                        </div>
+                        <button id="launch-btn" disabled style="margin-top:20px; color: red; border-color: red;" onclick="initiateLaunch()">LAUNCH</button>
+                    `;
+                case 'SOVIET_RU':
+                    return `
+                        <h3>KAVKAZ SYSTEM (КАВКАЗ)</h3>
+                        <p style="font-size: 0.7em;">ENTER COMMAND CODE</p>
+                        <input type="password" id="ru-code" style="background: #000; color: #f00; border: 1px solid #f00; width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 10px;">
+                        <button onclick="verifyRUCode()">ACTIVATE (АКТИВИРОВАТЬ)</button>
+                        <hr>
+                        <div class="switch-group">
+                            <span>MASTER ARM:</span>
+                            <div class="indicator" id="arm-ind"></div>
+                            <button onclick="toggleArm()">TOGGLE</button>
+                        </div>
+                        <div style="text-align: center; margin-top: 20px;">
+                            <div class="big-red-button" id="launch-btn-ru" onclick="initiateLaunch()"></div>
+                            <p>ПУСК</p>
+                        </div>
+                    `;
+                case 'MODERN_CN':
+                    return `
+                        <h3>STRATEGIC SUPPORT FORCE</h3>
+                        <div style="border: 1px solid #ffde00; padding: 10px; background: rgba(255, 222, 0, 0.1);">
+                            <p>BIOMETRIC AUTH REQUIRED</p>
+                            <button onmousedown="startBiometric()" onmouseup="stopBiometric()" style="width: 100%; height: 60px;">[ SCAN THUMBPRINT ]</button>
+                            <div id="bio-progress" style="height: 5px; background: #333; margin-top: 5px;"><div id="bio-bar" style="height: 100%; width: 0%; background: #ffde00;"></div></div>
+                        </div>
+                        <hr>
+                        <p style="font-size: 0.8em; text-align: center;">TARGET SELECTION ON MAIN STATUS DISPLAY</p>
+                        <button id="launch-btn-cn" disabled style="margin-top: 20px; width: 100%; height: 50px; background: #ffde00; color: #000;" onclick="initiateLaunch()">CONFIRM LAUNCH</button>
+                    `;
+                case 'RUGGED_NK':
+                    return `
+                        <h3>SUPREME COMMAND</h3>
+                        <div style="border: 2px solid #555; padding: 15px; background: #1a1a1a; font-family: monospace;">
+                            <p>> CONNECTING TO SATELLITE...</p>
+                            <p>> READY TO FIRE</p>
+                            <button onclick="verifyNK()" style="background: #333; color: #fff; width: 100%;">AUTHORIZE SUPREME LEADER</button>
+                        </div>
+                        <div style="text-align: center; margin-top: 20px;">
+                            <button onclick="initiateLaunch()" style="background: #ed1c24; color: #fff; padding: 20px 40px; font-size: 1.5em; border: 5px double #fff;">LAUNCH</button>
+                        </div>
+                    `;
+                default:
+                    return `
+                        <h3>GENERAL CONTROLS</h3>
+                        <div class="controls">
+                            <button onclick="updateLog('Authorizing...')">AUTHORIZE SYSTEM</button>
+                            <button onclick="updateLog('Targeting locked.')">SET TARGET</button>
+                            <button onclick="initiateLaunch()" style="color: red; border-color: red; padding: 20px;">EXECUTE LAUNCH</button>
+                        </div>
+                    `;
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
